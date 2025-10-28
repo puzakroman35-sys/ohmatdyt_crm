@@ -1311,3 +1311,134 @@ async def take_case(
     
     return db_case
 
+
+async def change_case_status(
+    db: Session,
+    case_id: UUID,
+    executor_id: UUID,
+    to_status: models.CaseStatus,
+    comment_text: str
+) -> models.Case:
+    """
+    Change case status with mandatory comment.
+    
+    This function is used by the responsible executor to change case status
+    from IN_PROGRESS to NEEDS_INFO, REJECTED, or DONE.
+    
+    Business rules:
+    - Only responsible executor can change status
+    - Comment is mandatory
+    - Valid transitions from IN_PROGRESS:
+        * IN_PROGRESS -> IN_PROGRESS (with comment)
+        * IN_PROGRESS -> NEEDS_INFO (additional info required)
+        * IN_PROGRESS -> REJECTED (case rejected)
+        * IN_PROGRESS -> DONE (case completed)
+    - Cases in DONE or REJECTED status cannot be edited (except comments)
+    
+    Args:
+        db: Database session
+        case_id: Case UUID
+        executor_id: UUID of the executor changing status
+        to_status: Target status
+        comment_text: Mandatory comment explaining the change
+        
+    Returns:
+        Updated case model with new status
+        
+    Raises:
+        ValueError: If validation fails (case not found, not responsible, invalid transition, etc.)
+    """
+    # Get case
+    db_case = await get_case(db, case_id)
+    if not db_case:
+        raise ValueError(f"Case with id '{case_id}' not found")
+    
+    # Validate executor
+    executor = await get_user(db, executor_id)
+    if not executor:
+        raise ValueError(f"Executor with id '{executor_id}' not found")
+    
+    # Only responsible executor can change status
+    if db_case.responsible_id != executor_id:
+        raise ValueError(
+            f"Only the responsible executor can change case status. "
+            f"Current responsible: {db_case.responsible_id}, "
+            f"Requesting user: {executor_id}"
+        )
+    
+    # Validate executor role
+    if executor.role not in [models.UserRole.EXECUTOR, models.UserRole.ADMIN]:
+        raise ValueError(
+            f"Only EXECUTOR or ADMIN can change case status. "
+            f"Current role: {executor.role.value}"
+        )
+    
+    # Validate status transition
+    current_status = db_case.status
+    
+    # Define valid transitions
+    valid_transitions = {
+        models.CaseStatus.IN_PROGRESS: [
+            models.CaseStatus.IN_PROGRESS,  # Allow staying in progress with comment
+            models.CaseStatus.NEEDS_INFO,
+            models.CaseStatus.REJECTED,
+            models.CaseStatus.DONE
+        ],
+        # Allow changes from NEEDS_INFO back to IN_PROGRESS or to final states
+        models.CaseStatus.NEEDS_INFO: [
+            models.CaseStatus.IN_PROGRESS,
+            models.CaseStatus.REJECTED,
+            models.CaseStatus.DONE
+        ]
+    }
+    
+    # Check if current status allows transitions
+    if current_status not in valid_transitions:
+        raise ValueError(
+            f"Cannot change status from {current_status.value}. "
+            f"Status changes are only allowed from IN_PROGRESS or NEEDS_INFO."
+        )
+    
+    # Check if target status is valid for current status
+    if to_status not in valid_transitions[current_status]:
+        allowed = ", ".join([s.value for s in valid_transitions[current_status]])
+        raise ValueError(
+            f"Invalid status transition: {current_status.value} -> {to_status.value}. "
+            f"Allowed transitions: {allowed}"
+        )
+    
+    # Validate comment
+    if not comment_text or len(comment_text.strip()) < 10:
+        raise ValueError("Comment is mandatory and must be at least 10 characters")
+    
+    # Update case status (only if it actually changes)
+    old_status = db_case.status
+    if old_status != to_status:
+        db_case.status = to_status
+        db.commit()
+        db.refresh(db_case)
+        
+        # Create status history record
+        await create_status_history(
+            db=db,
+            case_id=case_id,
+            old_status=old_status,
+            new_status=to_status,
+            changed_by_id=executor_id
+        )
+    
+    # Create comment (internal comment visible to executors/admin)
+    db_comment = models.Comment(
+        case_id=case_id,
+        author_id=executor_id,
+        text=comment_text,
+        is_internal=True  # Internal comment for status changes
+    )
+    
+    db.add(db_comment)
+    db.commit()
+    db.refresh(db_comment)
+    
+    return db_case
+
+

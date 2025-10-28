@@ -368,3 +368,43 @@ class CaseDetailResponse(CaseResponse):
     class Config:
         from_attributes = True
 
+
+# ==================== Case Status Change Schema ====================
+
+class CaseStatusChangeRequest(BaseModel):
+    """
+    Schema for changing case status.
+    
+    Used by responsible executor to change case status with mandatory comment.
+    Valid transitions from IN_PROGRESS:
+    - IN_PROGRESS -> NEEDS_INFO (additional information required)
+    - IN_PROGRESS -> REJECTED (case rejected)
+    - IN_PROGRESS -> DONE (case completed)
+    """
+    to_status: CaseStatus = Field(
+        ..., 
+        description="Target status (NEEDS_INFO, REJECTED, or DONE)"
+    )
+    comment: str = Field(
+        ..., 
+        min_length=10,
+        max_length=2000,
+        description="Mandatory comment explaining the status change"
+    )
+    
+    @field_validator('to_status')
+    @classmethod
+    def validate_target_status(cls, v: CaseStatus) -> CaseStatus:
+        """Validate that target status is one of the allowed statuses"""
+        allowed_statuses = [
+            CaseStatus.IN_PROGRESS,
+            CaseStatus.NEEDS_INFO,
+            CaseStatus.REJECTED,
+            CaseStatus.DONE
+        ]
+        if v not in allowed_statuses:
+            raise ValueError(
+                f"Invalid target status. Allowed: IN_PROGRESS, NEEDS_INFO, REJECTED, DONE"
+            )
+        return v
+

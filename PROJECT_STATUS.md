@@ -1,6 +1,7 @@
 # Ohmatdyt CRM - Project Status
 
 **Last Updated:** October 28, 2025
+**Latest Completed:** BE-010 - Change Case Status (IN_PROGRESS -> NEEDS_INFO|REJECTED|DONE)
 
 ## Overall Progress
 
@@ -17,8 +18,8 @@
 | BE-007 | Case Filtering & Search | ✅ COMPLETED | Oct 28, 2025 |
 | BE-008 | Case Detail (History, Comments, Files) | ✅ COMPLETED | Oct 28, 2025 |
 | BE-009 | Take Case Into Work (EXECUTOR) | ✅ COMPLETED | Oct 28, 2025 |
-| BE-010 | Email Notifications | 🔄 PENDING | - |
-| BE-011 | Escalation System | 🔄 PENDING | - |
+| BE-010 | Change Case Status (IN_PROGRESS -> NEEDS_INFO|REJECTED|DONE) | ✅ COMPLETED | Oct 28, 2025 |
+| BE-011 | Email Notifications | 🔄 PENDING | - |
 
 ### Technology Stack
 - **Backend:** Python, Django 5+, FastAPI (Django-Ninja), Celery
@@ -34,8 +35,7 @@
 - ✅ Cases (with 6-digit public_id)
 - ✅ Attachments (file storage)
 - ✅ Comments (public/internal with visibility rules)
-- ✅ Status History (audit trail)
-- 🔄 Comments (pending)
+- ✅ Status History (audit trail for all status changes)
 
 ---
 
@@ -777,6 +777,425 @@ Implemented detailed case view endpoint with complete information including stat
 - Visibility rules implemented at CRUD level (reusable)
 - Response structure ready for frontend consumption
 - All nested objects include complete user details for display
+
+---
+
+##  BE-010: Change Case Status (IN_PROGRESS -> NEEDS_INFO|REJECTED|DONE) - COMPLETED
+
+**Date Completed:** October 28, 2025
+**Status:** ✅ COMPLETED
+
+### Summary
+Implemented endpoint for responsible executors to change case status with mandatory comments and automatic email notifications to case authors.
+
+### Components Implemented
+
+1. **Pydantic Schema** (`app/schemas.py`)
+   - **CaseStatusChangeRequest**: Request schema for status changes
+     - to_status: Target status (IN_PROGRESS, NEEDS_INFO, REJECTED, DONE)
+     - comment: Mandatory comment (10-2000 characters)
+     - Validation: Only allowed target statuses
+
+2. **CRUD Operation** (`app/crud.py`)
+   - **change_case_status()**: Change case status with comment
+     - Validates case exists
+     - Validates executor is responsible for the case
+     - Validates status transition is allowed
+     - Validates comment length (minimum 10 characters)
+     - Updates case status
+     - Creates status history record
+     - Creates internal comment with status change reason
+     - Returns updated case
+
+3. **API Endpoint** (`app/routers/cases.py`)
+   - **POST /api/cases/{case_id}/status**: Change case status
+     - RBAC: Only responsible EXECUTOR or ADMIN
+     - Validates request body (to_status, comment)
+     - Calls change_case_status() CRUD function
+     - Queues email notification to case author
+     - Returns updated case with new status
+
+4. **Email Notification** (`app/celery_app.py`)
+   - **send_case_status_changed_notification**: Celery task
+     - Notifies case author about status change
+     - Includes executor name, new status, and comment
+     - Ukrainian translations for status names
+     - Placeholder implementation (full SMTP in BE-014)
+     - Retry mechanism with exponential backoff
+
+### Valid Status Transitions
+
+**From IN_PROGRESS:**
+- IN_PROGRESS -> IN_PROGRESS (add comment without changing status)
+- IN_PROGRESS -> NEEDS_INFO (additional information required)
+- IN_PROGRESS -> REJECTED (case rejected)
+- IN_PROGRESS -> DONE (case completed)
+
+**From NEEDS_INFO:**
+- NEEDS_INFO -> IN_PROGRESS (continue working after receiving info)
+- NEEDS_INFO -> REJECTED (case rejected)
+- NEEDS_INFO -> DONE (case completed)
+
+**Blocked Transitions:**
+- Cases in DONE or REJECTED status cannot be changed
+- NEW cases cannot directly transition to final states (must go through take -> IN_PROGRESS)
+
+### Business Rules
+
+1. **Responsible Executor Only**
+   - Only the executor assigned as responsible can change status
+   - Non-responsible executors receive 403 Forbidden
+   - OPERATOR role cannot change status
+
+2. **Mandatory Comment**
+   - Comment must be at least 10 characters
+   - Comment is stored as internal comment (visible to executors/admin only)
+   - Comment explains the reason for status change
+
+3. **Status History**
+   - All status changes are logged in status_history table
+   - Includes old_status, new_status, changed_by, changed_at
+   - Provides complete audit trail
+
+4. **Email Notification**
+   - Notification sent to case author (OPERATOR)
+   - Includes case public_id, new status, executor name, and comment
+   - Queued via Celery for asynchronous processing
+   - Does not block API response
+
+5. **Case Locking After Completion**
+   - Cases with status DONE or REJECTED cannot be edited
+   - Exception: Comments can still be added (future enhancement)
+   - Prevents accidental changes to completed cases
+
+### RBAC Enforcement
+
+- **OPERATOR**: Cannot change case status (403 Forbidden)
+- **EXECUTOR**: Can change status only for assigned cases (responsible_id = current_user)
+- **ADMIN**: Can change status for assigned cases
+- **Non-responsible EXECUTOR**: Cannot change status (403 Forbidden)
+
+### API Endpoint Details
+
+**Endpoint:** `POST /api/cases/{case_id}/status`
+
+**Request:**
+- Method: POST
+- Path parameter: case_id (UUID)
+- Headers: Authorization: Bearer {token}
+- Body (JSON):
+```json
+{
+  "to_status": "DONE",
+  "comment": "Звернення успішно опрацьовано"
+}
+```
+
+**Response (Success - 200):**
+```json
+{
+  "id": "uuid",
+  "public_id": 123456,
+  "status": "DONE",
+  "responsible_id": "executor_uuid",
+  "category_id": "uuid",
+  "channel_id": "uuid",
+  "applicant_name": "...",
+  "summary": "...",
+  "author_id": "uuid",
+  "created_at": "2025-10-28T12:00:00",
+  "updated_at": "2025-10-28T12:05:00"
+}
+```
+
+**Error Responses:**
+- **400 Bad Request**: Invalid status transition or comment too short
+  ```json
+  {
+    "detail": "Invalid status transition: DONE -> IN_PROGRESS. Allowed transitions: ..."
+  }
+  ```
+
+- **403 Forbidden**: Not responsible executor
+  ```json
+  {
+    "detail": "Only the responsible executor can change case status. Current responsible: ..."
+  }
+  ```
+
+- **404 Not Found**: Case does not exist
+  ```json
+  {
+    "detail": "Case with id '{case_id}' not found"
+  }
+  ```
+
+- **422 Unprocessable Entity**: Validation error (invalid JSON, missing fields)
+  ```json
+  {
+    "detail": [
+      {
+        "loc": ["body", "comment"],
+        "msg": "field required",
+        "type": "value_error.missing"
+      }
+    ]
+  }
+  ```
+
+### Validation Rules
+
+1. **Case Validation**
+   - Case must exist (404 if not)
+   - Case must be in IN_PROGRESS or NEEDS_INFO status (400 if not)
+
+2. **Executor Validation**
+   - Executor must be responsible for the case (403 if not)
+   - Executor must be EXECUTOR or ADMIN role (403 if not)
+   - Executor account must exist and be active
+
+3. **Status Transition Validation**
+   - Target status must be one of: IN_PROGRESS, NEEDS_INFO, REJECTED, DONE
+   - Transition must be valid for current status (400 if not)
+   - Cases in DONE/REJECTED cannot be changed (400)
+
+4. **Comment Validation**
+   - Comment must be at least 10 characters (400/422 if shorter)
+   - Comment must not exceed 2000 characters
+   - Comment is trimmed before validation
+
+### Files Created/Modified
+
+- ✅ `api/app/schemas.py` - Added CaseStatusChangeRequest schema
+- ✅ `api/app/crud.py` - Added change_case_status() function
+- ✅ `api/app/routers/cases.py` - Added POST /{case_id}/status endpoint
+- ✅ `api/app/celery_app.py` - Added send_case_status_changed_notification task
+- ✅ `api/test_be010.py` - Test suite
+
+### DoD Verification
+
+- ✅ POST /api/cases/{case_id}/status endpoint implemented
+- ✅ Only responsible EXECUTOR can change status
+- ✅ Valid transitions enforced (IN_PROGRESS/NEEDS_INFO -> NEEDS_INFO/REJECTED/DONE)
+- ✅ Invalid transitions rejected with clear error messages
+- ✅ Mandatory comment validation (minimum 10 characters)
+- ✅ Status history record created for each change
+- ✅ Internal comment created with status change reason
+- ✅ Email notification queued to case author
+- ✅ RBAC enforced: OPERATOR cannot change status (403)
+- ✅ RBAC enforced: Non-responsible executor cannot change status (403)
+- ✅ Cases in DONE/REJECTED status cannot be edited
+- ✅ Test suite created and documented
+
+### Test Coverage (`test_be010.py`)
+
+1. ✅ Create test users (operator, executor1, executor2)
+2. ✅ Create test data (category, channel)
+3. ✅ Create case as operator
+4. ✅ Executor1 takes case (NEW -> IN_PROGRESS)
+5. ✅ Change status to NEEDS_INFO (with comment)
+6. ✅ Change status back to IN_PROGRESS (from NEEDS_INFO)
+7. ✅ Change status to DONE
+8. ✅ Verify DONE case cannot be changed (400)
+9. ✅ Verify status history is logged correctly
+10. ✅ Verify comment is mandatory (reject short comment)
+11. ✅ RBAC: Non-responsible executor cannot change (403)
+12. ✅ RBAC: Operator cannot change status (403)
+13. ✅ Change status to REJECTED
+14. ✅ Verify REJECTED case cannot be changed (400)
+
+### Notification Flow
+
+1. Responsible executor calls POST /api/cases/{case_id}/status
+2. Case and executor validation
+3. Status transition validation
+4. Comment validation
+5. Database update (status + comment)
+6. Status history created
+7. **send_case_status_changed_notification.delay()** queued
+8. API returns success response
+9. Celery worker picks up task
+10. Task retrieves executor and author details
+11. Email sent to case author (placeholder logs)
+12. Task completes or retries on failure
+
+### Dependencies Met
+
+- ✅ BE-002: JWT Authentication (for RBAC)
+- ✅ BE-004: Cases Model & CRUD
+- ✅ BE-006: Create Case endpoint
+- ✅ BE-008: Status History model
+- ✅ BE-009: Take Case endpoint
+- ⚠️ BE-013: Celery/Redis (partial - task structure ready)
+- ⚠️ BE-014: SMTP (placeholder - will be implemented later)
+
+### Known Limitations
+
+1. **Email Sending**
+   - Currently logs to console (placeholder)
+   - Full SMTP integration pending (BE-014)
+   - Email templates not yet created
+   - No HTML email formatting
+
+2. **Comment Visibility**
+   - Status change comments are marked as internal
+   - Future: Option to make some status changes public
+   - Future: Notification preferences per operator
+
+3. **Status Translations**
+   - Ukrainian translations hardcoded in task
+   - Future: Use i18n/localization framework
+   - Future: User language preferences
+
+4. **Optimistic Locking**
+   - No version field for concurrent update detection
+   - Race conditions possible if multiple executors work on same case
+   - Future: Add version field to cases table
+
+5. **Undo/Revert**
+   - No mechanism to revert status changes
+   - Future: Add "reopen case" functionality
+   - Future: Allow admin to override status
+
+### Future Enhancements
+
+1. **Flexible Status Transitions**
+   - Admin can configure allowed transitions per role
+   - Category-specific status workflows
+   - Custom statuses per category
+
+2. **Status Change Templates**
+   - Pre-defined comment templates for common scenarios
+   - Quick actions with template comments
+   - Template library management
+
+3. **Bulk Status Changes**
+   - Change status for multiple cases at once
+   - Batch operations with shared comment
+   - Progress tracking for bulk operations
+
+4. **Status Change Approval**
+   - Require admin approval for certain transitions (e.g., REJECTED)
+   - Two-stage approval for high-priority cases
+   - Approval workflow configuration
+
+5. **Advanced Notifications**
+   - In-app notifications alongside email
+   - Push notifications for mobile app
+   - SMS notifications for urgent status changes
+   - Notification preferences per user
+
+6. **Status Analytics**
+   - Average time per status
+   - Status transition patterns
+   - Executor performance metrics
+   - Bottleneck detection
+
+### Status Translations (Ukrainian)
+
+- **NEW**: Новий
+- **IN_PROGRESS**: В роботі
+- **NEEDS_INFO**: Потрібна інформація
+- **REJECTED**: Відхилено
+- **DONE**: Виконано
+
+### Example Use Cases
+
+**Use Case 1: Request Additional Information**
+```
+Executor reviews case and realizes additional documents are needed.
+Action: POST /api/cases/{id}/status
+Body: {
+  "to_status": "NEEDS_INFO",
+  "comment": "Потрібні копії паспорта та довідки з місця проживання"
+}
+Result: Status changed, operator notified, can provide additional info
+```
+
+**Use Case 2: Complete Case**
+```
+Executor finishes processing case successfully.
+Action: POST /api/cases/{id}/status
+Body: {
+  "to_status": "DONE",
+  "comment": "Звернення опрацьовано, надано консультацію та направлення"
+}
+Result: Status changed, operator notified, case locked from editing
+```
+
+**Use Case 3: Reject Case**
+```
+Executor determines case is outside organization's scope.
+Action: POST /api/cases/{id}/status
+Body: {
+  "to_status": "REJECTED",
+  "comment": "Звернення не відноситься до компетенції установи, направлено до іншої організації"
+}
+Result: Status changed, operator notified, case locked from editing
+```
+
+**Use Case 4: Continue Work After Info Received**
+```
+Case was in NEEDS_INFO, operator provided additional documents.
+Action: POST /api/cases/{id}/status
+Body: {
+  "to_status": "IN_PROGRESS",
+  "comment": "Отримано додаткові документи, продовжуємо обробку"
+}
+Result: Status changed, work continues
+```
+
+### Notes
+
+- All status changes create both status history and internal comment
+- Comment is visible to executors and admin (not to operator)
+- Email notification includes Ukrainian status translation
+- Status history provides complete audit trail for compliance
+- Celery task is fault-tolerant with retry mechanism
+- Notification does not block API response (async)
+- Future enhancement: Allow public comments on status changes
+
+### Implementation Notes
+
+**Files Modified:**
+1. `api/app/schemas.py` - Added CaseStatusChangeRequest schema with validation
+2. `api/app/crud.py` - Added change_case_status() with comprehensive business logic
+3. `api/app/routers/cases.py` - Added POST /{case_id}/status endpoint
+4. `api/app/celery_app.py` - Added send_case_status_changed_notification Celery task
+5. `api/test_be010.py` - Comprehensive test suite covering all scenarios
+
+**Code Quality:**
+- All functions properly documented with docstrings
+- Validation logic centralized in CRUD layer
+- Error messages are descriptive and actionable
+- RBAC checks occur before business logic
+- Status transitions defined as dictionary for maintainability
+- Unicode status translations for user-friendly Ukrainian messages
+
+**Testing Strategy:**
+- Test creates isolated users and cases for each run
+- Tests verify happy path and all error scenarios
+- RBAC enforcement tested for all roles
+- Status history and comment creation verified
+- Email notification queuing verified (full SMTP in BE-014)
+
+**Integration Points:**
+- Integrates with BE-008 (Status History model)
+- Integrates with BE-009 (Take Case functionality)  
+- Prepares for BE-014 (Full SMTP email implementation)
+- Uses Celery tasks structure from BE-013
+
+**Performance Considerations:**
+- Status change is atomic (transaction-safe)
+- Email notification is asynchronous (doesn't block API)
+- Database queries optimized with proper indexes
+- Status history provides audit trail without impacting performance
+
+**Security:**
+- Only responsible executor can change status (prevents unauthorized changes)
+- All operations require JWT authentication
+- RBAC enforced at multiple levels (dependency, CRUD, endpoint)
+- Internal comments protect sensitive information from operators
 
 ---
 

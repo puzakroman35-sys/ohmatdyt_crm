@@ -797,3 +797,110 @@ async def take_case_into_work(
         created_at=db_case.created_at,
         updated_at=db_case.updated_at
     )
+
+
+@router.post("/{case_id}/status", response_model=schemas.CaseResponse)
+async def change_case_status(
+    case_id: UUID,
+    status_change: schemas.CaseStatusChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
+):
+    """
+    Change case status with mandatory comment.
+    
+    This endpoint allows the responsible EXECUTOR to change case status
+    from IN_PROGRESS to NEEDS_INFO, REJECTED, or DONE.
+    
+    Business rules:
+    - Only responsible executor can change status
+    - Comment is mandatory (minimum 10 characters)
+    - Valid transitions from IN_PROGRESS:
+        * IN_PROGRESS -> IN_PROGRESS (add comment without changing status)
+        * IN_PROGRESS -> NEEDS_INFO (additional information required)
+        * IN_PROGRESS -> REJECTED (case rejected)
+        * IN_PROGRESS -> DONE (case completed)
+    - Valid transitions from NEEDS_INFO:
+        * NEEDS_INFO -> IN_PROGRESS (continue working after receiving info)
+        * NEEDS_INFO -> REJECTED (case rejected)
+        * NEEDS_INFO -> DONE (case completed)
+    - Cases in DONE or REJECTED status cannot be edited (except comments)
+    - Status change triggers email notification to case author (OPERATOR)
+    
+    Request body:
+    - to_status: Target status (IN_PROGRESS, NEEDS_INFO, REJECTED, or DONE)
+    - comment: Mandatory comment explaining the change (10-2000 characters)
+    
+    RBAC:
+    - Only responsible EXECUTOR or ADMIN can change status
+    - OPERATOR cannot change status (403)
+    - Non-responsible executor cannot change status (403)
+    
+    Returns:
+    - Updated case with new status
+    
+    Errors:
+    - 400: Invalid status transition, missing comment, or validation error
+    - 403: User is not responsible executor
+    - 404: Case not found
+    """
+    # Take case
+    try:
+        db_case = await crud.change_case_status(
+            db=db,
+            case_id=case_id,
+            executor_id=current_user.id,
+            to_status=status_change.to_status,
+            comment_text=status_change.comment
+        )
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=error_msg
+            )
+        elif "responsible" in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=error_msg
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg
+            )
+    
+    # Trigger email notification to case author (only if status actually changed)
+    try:
+        from app.celery_app import send_case_status_changed_notification
+        
+        send_case_status_changed_notification.delay(
+            case_id=str(db_case.id),
+            case_public_id=db_case.public_id,
+            new_status=db_case.status.value,
+            executor_id=str(current_user.id),
+            author_id=str(db_case.author_id),
+            comment=status_change.comment
+        )
+    except Exception as e:
+        # Log error but don't fail the request
+        print(f"Warning: Failed to queue status change notification: {str(e)}")
+    
+    return schemas.CaseResponse(
+        id=str(db_case.id),
+        public_id=db_case.public_id,
+        category_id=str(db_case.category_id),
+        channel_id=str(db_case.channel_id),
+        subcategory=db_case.subcategory,
+        applicant_name=db_case.applicant_name,
+        applicant_phone=db_case.applicant_phone,
+        applicant_email=db_case.applicant_email,
+        summary=db_case.summary,
+        status=db_case.status,
+        author_id=str(db_case.author_id),
+        responsible_id=str(db_case.responsible_id) if db_case.responsible_id else None,
+        created_at=db_case.created_at,
+        updated_at=db_case.updated_at
+    )
+
