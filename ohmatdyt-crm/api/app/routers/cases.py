@@ -703,3 +703,97 @@ async def list_cases(
         "page": skip // limit + 1 if limit > 0 else 1,
         "page_size": limit
     }
+
+
+@router.post("/{case_id}/take", response_model=schemas.CaseResponse)
+async def take_case_into_work(
+    case_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
+):
+    """
+    Take a case into work by an executor.
+    
+    This endpoint allows an EXECUTOR or ADMIN to:
+    - Take ownership of a case in NEW status
+    - Change status to IN_PROGRESS
+    - Become the responsible executor
+    
+    Business rules:
+    - Only cases with status=NEW can be taken
+    - Only EXECUTOR or ADMIN roles can take cases
+    - Sets responsible_id to current user
+    - Changes status to IN_PROGRESS
+    - Creates status history record (NEW -> IN_PROGRESS)
+    - Triggers email notification to case author (OPERATOR)
+    
+    RBAC:
+    - EXECUTOR: Can take any NEW case
+    - ADMIN: Can take any NEW case
+    - OPERATOR: Cannot take cases (403)
+    
+    Returns:
+    - Updated case with status=IN_PROGRESS and responsible_id set
+    
+    Errors:
+    - 400: Case is not in NEW status
+    - 403: User is not EXECUTOR or ADMIN
+    - 404: Case not found
+    """
+    # Check RBAC: Only EXECUTOR or ADMIN can take cases
+    if current_user.role not in [models.UserRole.EXECUTOR, models.UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only EXECUTOR or ADMIN can take cases into work"
+        )
+    
+    # Take case
+    try:
+        db_case = await crud.take_case(
+            db=db,
+            case_id=case_id,
+            executor_id=current_user.id
+        )
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=error_msg
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg
+            )
+    
+    # Trigger email notification to case author
+    try:
+        from app.celery_app import send_case_taken_notification
+        
+        send_case_taken_notification.delay(
+            case_id=str(db_case.id),
+            case_public_id=db_case.public_id,
+            executor_id=str(current_user.id),
+            author_id=str(db_case.author_id)
+        )
+    except Exception as e:
+        # Log error but don't fail the request
+        print(f"Warning: Failed to queue case taken notification: {str(e)}")
+    
+    return schemas.CaseResponse(
+        id=str(db_case.id),
+        public_id=db_case.public_id,
+        category_id=str(db_case.category_id),
+        channel_id=str(db_case.channel_id),
+        subcategory=db_case.subcategory,
+        applicant_name=db_case.applicant_name,
+        applicant_phone=db_case.applicant_phone,
+        applicant_email=db_case.applicant_email,
+        summary=db_case.summary,
+        status=db_case.status,
+        author_id=str(db_case.author_id),
+        responsible_id=str(db_case.responsible_id) if db_case.responsible_id else None,
+        created_at=db_case.created_at,
+        updated_at=db_case.updated_at
+    )

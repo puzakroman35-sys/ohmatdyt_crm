@@ -16,8 +16,9 @@
 | BE-006 | Create Case (multipart) + Email Trigger | ✅ COMPLETED | Oct 28, 2025 |
 | BE-007 | Case Filtering & Search | ✅ COMPLETED | Oct 28, 2025 |
 | BE-008 | Case Detail (History, Comments, Files) | ✅ COMPLETED | Oct 28, 2025 |
-| BE-009 | Email Notifications | 🔄 PENDING | - |
-| BE-010 | Escalation System | 🔄 PENDING | - |
+| BE-009 | Take Case Into Work (EXECUTOR) | ✅ COMPLETED | Oct 28, 2025 |
+| BE-010 | Email Notifications | 🔄 PENDING | - |
+| BE-011 | Escalation System | 🔄 PENDING | - |
 
 ### Technology Stack
 - **Backend:** Python, Django 5+, FastAPI (Django-Ninja), Celery
@@ -776,6 +777,251 @@ Implemented detailed case view endpoint with complete information including stat
 - Visibility rules implemented at CRUD level (reusable)
 - Response structure ready for frontend consumption
 - All nested objects include complete user details for display
+
+---
+
+##  BE-009: Take Case Into Work (EXECUTOR) - COMPLETED
+
+**Date Completed:** October 28, 2025
+**Status:** ✅ COMPLETED
+
+### Summary
+Implemented functionality for executors to take ownership of NEW cases, changing status to IN_PROGRESS and triggering email notifications to case authors.
+
+### Components Implemented
+
+1. **CRUD Operation** (`app/crud.py`)
+   - **take_case()**: Take case into work
+     - Validates case exists and is in NEW status
+     - Validates executor is EXECUTOR or ADMIN role
+     - Validates executor is active
+     - Sets responsible_id to executor
+     - Changes status from NEW to IN_PROGRESS
+     - Creates status history record
+     - Returns updated case
+
+2. **API Endpoint** (`app/routers/cases.py`)
+   - **POST /api/cases/{case_id}/take**: Take case into work
+     - RBAC: Only EXECUTOR and ADMIN can take cases
+     - OPERATOR receives 403 Forbidden
+     - Validates case is in NEW status (400 if not)
+     - Queues email notification to case author
+     - Returns updated case with new status and responsible
+
+3. **Email Notification** (`app/celery_app.py`)
+   - **send_case_taken_notification**: Celery task
+     - Notifies case author (OPERATOR) that case is being processed
+     - Retrieves executor and author details
+     - Placeholder implementation (full SMTP in BE-014)
+     - Retry mechanism with exponential backoff
+     - Logs notification details to console
+
+### Business Rules
+
+1. **Status Validation**
+   - Only cases with status=NEW can be taken
+   - Cases in other statuses return 400 Bad Request
+   - Error message clearly indicates current status
+
+2. **Responsible Assignment**
+   - responsible_id is set to current executor
+   - Previous responsible (if any) is overwritten
+   - Only one executor can be responsible at a time
+
+3. **Status Transition**
+   - Status changes from NEW to IN_PROGRESS
+   - Transition is logged in status_history
+   - old_status=NEW, new_status=IN_PROGRESS
+   - changed_by is set to executor taking the case
+
+4. **Email Notification**
+   - Notification sent to case author (OPERATOR)
+   - Includes case public_id and executor name
+   - Queued via Celery for asynchronous processing
+   - Does not block API response
+
+### RBAC Enforcement
+
+- **OPERATOR**: Cannot take cases (403 Forbidden)
+- **EXECUTOR**: Can take any NEW case
+- **ADMIN**: Can take any NEW case
+- **Active Users Only**: Deactivated executors cannot take cases
+
+### API Endpoint Details
+
+**Endpoint:** `POST /api/cases/{case_id}/take`
+
+**Request:**
+- Method: POST
+- Path parameter: case_id (UUID)
+- Headers: Authorization: Bearer {token}
+- Body: None
+
+**Response (Success - 200):**
+```json
+{
+  "id": "uuid",
+  "public_id": 123456,
+  "status": "IN_PROGRESS",
+  "responsible_id": "executor_uuid",
+  "category_id": "uuid",
+  "channel_id": "uuid",
+  "applicant_name": "...",
+  "summary": "...",
+  "author_id": "uuid",
+  "created_at": "2025-10-28T12:00:00",
+  "updated_at": "2025-10-28T12:05:00"
+}
+```
+
+**Error Responses:**
+- **400 Bad Request**: Case is not in NEW status
+  ```json
+  {
+    "detail": "Case can only be taken when status is NEW. Current status: IN_PROGRESS"
+  }
+  ```
+
+- **403 Forbidden**: User is not EXECUTOR or ADMIN
+  ```json
+  {
+    "detail": "Only EXECUTOR or ADMIN can take cases into work"
+  }
+  ```
+
+- **404 Not Found**: Case does not exist
+  ```json
+  {
+    "detail": "Case with id '{case_id}' not found"
+  }
+  ```
+
+### Validation Rules
+
+1. **Case Validation**
+   - Case must exist (404 if not)
+   - Case must be in NEW status (400 if not)
+
+2. **Executor Validation**
+   - User must be EXECUTOR or ADMIN (403 if not)
+   - Executor must be active (400 if not)
+   - Executor account must exist (400 if not)
+
+3. **Atomicity**
+   - Status change and responsible assignment are atomic
+   - Status history is created after successful update
+   - Email notification queued after all database operations
+
+### Files Created/Modified
+
+- ✅ `api/app/crud.py` - Added take_case() function
+- ✅ `api/app/routers/cases.py` - Added POST /{case_id}/take endpoint
+- ✅ `api/app/celery_app.py` - Added send_case_taken_notification task
+- ✅ `api/test_be009.py` - Test suite
+
+### DoD Verification
+
+- ✅ Only NEW cases can be taken
+- ✅ Status changes to IN_PROGRESS
+- ✅ responsible_id is set to executor
+- ✅ Status history record created (NEW -> IN_PROGRESS)
+- ✅ RBAC enforced: OPERATOR cannot take (403)
+- ✅ RBAC enforced: EXECUTOR can take
+- ✅ RBAC enforced: ADMIN can take
+- ✅ Email notification queued
+- ✅ Test suite created and documented
+
+### Test Coverage (`test_be009.py`)
+
+1. ✅ Create test data (category, channel, operator, executor)
+2. ✅ Operator creates NEW case
+3. ✅ Operator attempts to take case (403)
+4. ✅ Executor successfully takes case
+5. ✅ Verify status changed to IN_PROGRESS
+6. ✅ Verify responsible set to executor
+7. ✅ Verify status history logged
+8. ✅ Attempt to take same case again (400)
+9. ✅ Admin can also take cases
+
+### Notification Flow
+
+1. Executor calls POST /api/cases/{case_id}/take
+2. Case validation (exists, NEW status)
+3. Executor validation (role, active)
+4. Database update (status, responsible)
+5. Status history created
+6. **send_case_taken_notification.delay()** queued
+7. API returns success response
+8. Celery worker picks up task
+9. Task retrieves executor and author details
+10. Email sent to case author (placeholder logs)
+11. Task completes or retries on failure
+
+### Dependencies Met
+
+- ✅ BE-002: JWT Authentication (for RBAC)
+- ✅ BE-004: Cases Model & CRUD
+- ✅ BE-008: Status History model
+- ⚠️ BE-013: Celery/Redis (partial - task structure ready)
+- ⚠️ BE-014: SMTP (placeholder - will be implemented later)
+
+### Known Limitations
+
+1. **Email Sending**
+   - Currently logs to console (placeholder)
+   - Full SMTP integration pending (BE-014)
+   - Email templates not yet created
+
+2. **Category-based Assignment**
+   - Any EXECUTOR can take any NEW case
+   - Future: Restrict to executors of matching category
+   - Requires: executor_categories table
+
+3. **Concurrent Takes**
+   - No locking mechanism for concurrent take requests
+   - Last writer wins if multiple executors take simultaneously
+   - Future: Implement optimistic locking with version field
+
+4. **Notification Timing**
+   - Notification queued but not guaranteed delivery
+   - No tracking of notification status
+   - Future: Add notification_log table
+
+### Future Enhancements
+
+1. **Category-based Access Control**
+   - Executors assigned to specific categories
+   - Only show cases in executor's categories
+   - Prevent taking cases outside assigned categories
+
+2. **Workload Balancing**
+   - Track active cases per executor
+   - Suggest least busy executor
+   - Auto-assignment based on workload
+
+3. **Take History**
+   - Track all take attempts (successful and failed)
+   - Show who else viewed/considered the case
+   - Analytics on case assignment patterns
+
+4. **Notification Enhancements**
+   - In-app notifications alongside email
+   - Push notifications for mobile app
+   - Notification preferences per user
+
+5. **Optimistic Locking**
+   - Add version field to cases table
+   - Prevent race conditions on concurrent takes
+   - Return conflict error (409) on version mismatch
+
+### Notes
+
+- Endpoint follows RESTful design pattern
+- Error messages are descriptive and actionable
+- RBAC checks occur before business logic validation
+- Status history provides audit trail for compliance
+- Celery task is fault-tolerant with retry mechanism
+- Notification does not block API response (async)
 
 
 

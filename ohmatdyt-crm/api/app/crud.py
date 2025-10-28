@@ -1247,3 +1247,67 @@ async def create_status_history(
     
     return db_history
 
+
+async def take_case(
+    db: Session,
+    case_id: UUID,
+    executor_id: UUID
+) -> models.Case:
+    """
+    Take a case into work by an executor.
+    
+    Changes:
+    - Sets responsible_id to current executor
+    - Changes status from NEW to IN_PROGRESS
+    - Creates status history record
+    
+    Args:
+        db: Database session
+        case_id: Case UUID
+        executor_id: Executor user UUID
+        
+    Returns:
+        Updated case model
+        
+    Raises:
+        ValueError: If case not found, not in NEW status, or executor invalid
+    """
+    # Get case
+    db_case = await get_case(db, case_id)
+    if not db_case:
+        raise ValueError(f"Case with id '{case_id}' not found")
+    
+    # Validate status
+    if db_case.status != models.CaseStatus.NEW:
+        raise ValueError(f"Case can only be taken when status is NEW. Current status: {db_case.status.value}")
+    
+    # Validate executor
+    executor = await get_user(db, executor_id)
+    if not executor:
+        raise ValueError(f"Executor with id '{executor_id}' not found")
+    
+    if executor.role not in [models.UserRole.EXECUTOR, models.UserRole.ADMIN]:
+        raise ValueError(f"User must be EXECUTOR or ADMIN to take cases. Current role: {executor.role.value}")
+    
+    if not executor.is_active:
+        raise ValueError(f"Executor '{executor.username}' is not active")
+    
+    # Update case
+    old_status = db_case.status
+    db_case.status = models.CaseStatus.IN_PROGRESS
+    db_case.responsible_id = executor_id
+    
+    db.commit()
+    db.refresh(db_case)
+    
+    # Create status history record
+    await create_status_history(
+        db=db,
+        case_id=case_id,
+        old_status=old_status,
+        new_status=models.CaseStatus.IN_PROGRESS,
+        changed_by_id=executor_id
+    )
+    
+    return db_case
+
