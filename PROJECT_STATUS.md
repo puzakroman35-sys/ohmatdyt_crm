@@ -195,7 +195,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-simple.ps1
 ### Backend (Фаза 1 - MVP)
 - [x] BE-001: Database models & Alembic migrations ✅ COMPLETED
 - [x] BE-002: User authentication & JWT implementation ✅ COMPLETED
-- [ ] BE-003: Patient management endpoints
+- [x] BE-003: Categories and Channels (CRUD, activation/deactivation) ✅ COMPLETED
 - [ ] BE-004: Doctor management endpoints
 - [ ] BE-005: Appointment scheduling
 
@@ -333,3 +333,49 @@ docker compose exec api pytest --cov=app --cov-report=html
 - Role-based authorization
 - Input validation with Pydantic
 - CORS protection
+
+---
+
+### BE-003: Categories and Channels - COMPLETED ✅
+
+**Implemented Features:**
+- ✅ Category model (id, name, is_active, created_at, updated_at)
+- ✅ Channel model (id, name, is_active, created_at, updated_at)
+- ✅ Database migration (Alembic)
+- ✅ CRUD operations for both entities
+- ✅ Activation/deactivation endpoints
+- ✅ Uniqueness validation (name field)
+- ✅ Active status filtering (include_inactive parameter)
+- ✅ Admin-only access control
+- ✅ Alphabetical sorting by name
+
+**API Endpoints:**
+- `GET /api/categories` - List all active categories
+- `GET /api/categories?include_inactive=true` - List all categories
+- `POST /api/categories` - Create category (admin only)
+- `GET /api/categories/{id}` - Get category by ID
+- `PUT /api/categories/{id}` - Update category (admin only)
+- `POST /api/categories/{id}/activate` - Activate category (admin only)
+- `POST /api/categories/{id}/deactivate` - Deactivate category (admin only)
+- `GET /api/channels` - List all active channels
+- `GET /api/channels?include_inactive=true` - List all channels
+- `POST /api/channels` - Create channel (admin only)
+- `GET /api/channels/{id}` - Get channel by ID
+- `PUT /api/channels/{id}` - Update channel (admin only)
+- `POST /api/channels/{id}/activate` - Activate channel (admin only)
+- `POST /api/channels/{id}/deactivate` - Deactivate channel (admin only)
+
+**Test Results:**
+- ✅ Categories created successfully (tested with 2 categories)
+- ✅ Channels created successfully (tested with 4 channels: Phone, Email, Web Form, In Person)
+- ✅ Deactivation working (is_active=False)
+- ✅ Active filtering working (include_inactive parameter)
+- ✅ Uniqueness validation rejecting duplicates
+- ✅ Alphabetical sorting confirmed
+- ✅ Admin-only access enforced
+
+**Database Changes:**
+- Created `categories` table with UUID primary key
+- Created `channels` table with UUID primary key
+- Added unique constraints on name fields
+- Added indexes for performance

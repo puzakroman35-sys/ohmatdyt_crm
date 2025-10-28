@@ -109,3 +109,71 @@ class AccessTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int  # seconds until access token expires
+
+
+# ==================== Category Schemas ====================
+
+class CategoryBase(BaseModel):
+    """Base category schema"""
+    name: str = Field(..., min_length=1, max_length=200)
+
+
+class CategoryCreate(CategoryBase):
+    """Schema for creating a new category"""
+    pass
+
+
+class CategoryUpdate(BaseModel):
+    """Schema for updating category"""
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+
+
+class CategoryResponse(CategoryBase):
+    """Schema for category response"""
+    id: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CategoryListResponse(BaseModel):
+    """Schema for category list"""
+    categories: list[CategoryResponse]
+    total: int
+
+
+# ==================== Channel Schemas ====================
+
+class ChannelBase(BaseModel):
+    """Base channel schema"""
+    name: str = Field(..., min_length=1, max_length=200)
+
+
+class ChannelCreate(ChannelBase):
+    """Schema for creating a new channel"""
+    pass
+
+
+class ChannelUpdate(BaseModel):
+    """Schema for updating channel"""
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+
+
+class ChannelResponse(ChannelBase):
+    """Schema for channel response"""
+    id: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChannelListResponse(BaseModel):
+    """Schema for channel list"""
+    channels: list[ChannelResponse]
+    total: int

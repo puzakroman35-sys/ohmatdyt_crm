@@ -54,3 +54,62 @@ class User(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+class Category(Base):
+    """
+    Request category directory (довідник категорій звернень)
+    
+    Used for classifying requests. Only active categories
+    are available for selection when creating requests.
+    """
+    __tablename__ = "categories"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    name = Column(String(200), unique=True, nullable=False, index=True)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<Category(name={self.name}, active={self.is_active})>"
+
+    def to_dict(self):
+        """Convert category to dictionary"""
+        return {
+            "id": str(self.id),
+            "name": self.name,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class Channel(Base):
+    """
+    Request channel directory (довідник каналів звернень)
+    
+    Represents the communication channel through which a request was received
+    (e.g., Phone, Email, Web Form, In Person). Only active channels
+    are available for selection when creating requests.
+    """
+    __tablename__ = "channels"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    name = Column(String(200), unique=True, nullable=False, index=True)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<Channel(name={self.name}, active={self.is_active})>"
+
+    def to_dict(self):
+        """Convert channel to dictionary"""
+        return {
+            "id": str(self.id),
+            "name": self.name,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }

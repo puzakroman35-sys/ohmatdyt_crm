@@ -15,6 +15,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY ./app /app/app
 
+# Copy alembic configuration and migrations
+COPY alembic.ini /app/
+COPY alembic /app/alembic
+
 # Create media and static directories
 RUN mkdir -p /var/app/media /var/app/static
 

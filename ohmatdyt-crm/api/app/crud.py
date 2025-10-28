@@ -275,3 +275,361 @@ async def activate_user(db: Session, user_id: UUID) -> Optional[models.User]:
     db.refresh(db_user)
     
     return db_user
+
+
+# ==================== Category CRUD Operations ====================
+
+async def create_category(db: Session, category: schemas.CategoryCreate) -> models.Category:
+    """
+    Create a new category.
+    
+    Args:
+        db: Database session
+        category: Category creation schema
+        
+    Returns:
+        Created category model
+        
+    Raises:
+        ValueError: If category name already exists
+    """
+    # Check if name exists
+    existing = db.execute(
+        select(models.Category).where(models.Category.name == category.name)
+    ).scalar_one_or_none()
+    if existing:
+        raise ValueError(f"Category '{category.name}' already exists")
+    
+    db_category = models.Category(name=category.name)
+    
+    db.add(db_category)
+    db.commit()
+    db.refresh(db_category)
+    
+    return db_category
+
+
+async def get_category(db: Session, category_id: UUID) -> Optional[models.Category]:
+    """
+    Get category by ID.
+    
+    Args:
+        db: Database session
+        category_id: Category UUID
+        
+    Returns:
+        Category model or None if not found
+    """
+    return db.execute(
+        select(models.Category).where(models.Category.id == category_id)
+    ).scalar_one_or_none()
+
+
+async def get_category_by_name(db: Session, name: str) -> Optional[models.Category]:
+    """
+    Get category by name.
+    
+    Args:
+        db: Database session
+        name: Category name
+        
+    Returns:
+        Category model or None if not found
+    """
+    return db.execute(
+        select(models.Category).where(models.Category.name == name)
+    ).scalar_one_or_none()
+
+
+async def get_categories(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    include_inactive: bool = False
+) -> list[models.Category]:
+    """
+    Get list of categories with optional filtering.
+    
+    Args:
+        db: Database session
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        include_inactive: Include inactive categories
+        
+    Returns:
+        List of category models
+    """
+    query = select(models.Category)
+    
+    if not include_inactive:
+        query = query.where(models.Category.is_active == True)
+    
+    query = query.offset(skip).limit(limit).order_by(models.Category.name)
+    
+    return list(db.execute(query).scalars().all())
+
+
+async def update_category(
+    db: Session,
+    category_id: UUID,
+    category_update: schemas.CategoryUpdate
+) -> Optional[models.Category]:
+    """
+    Update category information.
+    
+    Args:
+        db: Database session
+        category_id: Category UUID
+        category_update: Category update schema
+        
+    Returns:
+        Updated category model or None if not found
+        
+    Raises:
+        ValueError: If new name already exists for another category
+    """
+    db_category = await get_category(db, category_id)
+    if not db_category:
+        return None
+    
+    update_data = category_update.model_dump(exclude_unset=True)
+    
+    # Check name uniqueness if being updated
+    if 'name' in update_data and update_data['name'] != db_category.name:
+        existing = await get_category_by_name(db, update_data['name'])
+        if existing and existing.id != category_id:
+            raise ValueError(f"Category '{update_data['name']}' already exists")
+    
+    # Update fields
+    for field, value in update_data.items():
+        setattr(db_category, field, value)
+    
+    db.commit()
+    db.refresh(db_category)
+    
+    return db_category
+
+
+async def deactivate_category(db: Session, category_id: UUID) -> Optional[models.Category]:
+    """
+    Deactivate category.
+    
+    Args:
+        db: Database session
+        category_id: Category UUID
+        
+    Returns:
+        Updated category model or None if not found
+    """
+    db_category = await get_category(db, category_id)
+    if not db_category:
+        return None
+    
+    db_category.is_active = False
+    
+    db.commit()
+    db.refresh(db_category)
+    
+    return db_category
+
+
+async def activate_category(db: Session, category_id: UUID) -> Optional[models.Category]:
+    """
+    Activate category.
+    
+    Args:
+        db: Database session
+        category_id: Category UUID
+        
+    Returns:
+        Updated category model or None if not found
+    """
+    db_category = await get_category(db, category_id)
+    if not db_category:
+        return None
+    
+    db_category.is_active = True
+    
+    db.commit()
+    db.refresh(db_category)
+    
+    return db_category
+
+
+# ==================== Channel CRUD Operations ====================
+
+async def create_channel(db: Session, channel: schemas.ChannelCreate) -> models.Channel:
+    """
+    Create a new channel.
+    
+    Args:
+        db: Database session
+        channel: Channel creation schema
+        
+    Returns:
+        Created channel model
+        
+    Raises:
+        ValueError: If channel name already exists
+    """
+    # Check if name exists
+    existing = db.execute(
+        select(models.Channel).where(models.Channel.name == channel.name)
+    ).scalar_one_or_none()
+    if existing:
+        raise ValueError(f"Channel '{channel.name}' already exists")
+    
+    db_channel = models.Channel(name=channel.name)
+    
+    db.add(db_channel)
+    db.commit()
+    db.refresh(db_channel)
+    
+    return db_channel
+
+
+async def get_channel(db: Session, channel_id: UUID) -> Optional[models.Channel]:
+    """
+    Get channel by ID.
+    
+    Args:
+        db: Database session
+        channel_id: Channel UUID
+        
+    Returns:
+        Channel model or None if not found
+    """
+    return db.execute(
+        select(models.Channel).where(models.Channel.id == channel_id)
+    ).scalar_one_or_none()
+
+
+async def get_channel_by_name(db: Session, name: str) -> Optional[models.Channel]:
+    """
+    Get channel by name.
+    
+    Args:
+        db: Database session
+        name: Channel name
+        
+    Returns:
+        Channel model or None if not found
+    """
+    return db.execute(
+        select(models.Channel).where(models.Channel.name == name)
+    ).scalar_one_or_none()
+
+
+async def get_channels(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    include_inactive: bool = False
+) -> list[models.Channel]:
+    """
+    Get list of channels with optional filtering.
+    
+    Args:
+        db: Database session
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        include_inactive: Include inactive channels
+        
+    Returns:
+        List of channel models
+    """
+    query = select(models.Channel)
+    
+    if not include_inactive:
+        query = query.where(models.Channel.is_active == True)
+    
+    query = query.offset(skip).limit(limit).order_by(models.Channel.name)
+    
+    return list(db.execute(query).scalars().all())
+
+
+async def update_channel(
+    db: Session,
+    channel_id: UUID,
+    channel_update: schemas.ChannelUpdate
+) -> Optional[models.Channel]:
+    """
+    Update channel information.
+    
+    Args:
+        db: Database session
+        channel_id: Channel UUID
+        channel_update: Channel update schema
+        
+    Returns:
+        Updated channel model or None if not found
+        
+    Raises:
+        ValueError: If new name already exists for another channel
+    """
+    db_channel = await get_channel(db, channel_id)
+    if not db_channel:
+        return None
+    
+    update_data = channel_update.model_dump(exclude_unset=True)
+    
+    # Check name uniqueness if being updated
+    if 'name' in update_data and update_data['name'] != db_channel.name:
+        existing = await get_channel_by_name(db, update_data['name'])
+        if existing and existing.id != channel_id:
+            raise ValueError(f"Channel '{update_data['name']}' already exists")
+    
+    # Update fields
+    for field, value in update_data.items():
+        setattr(db_channel, field, value)
+    
+    db.commit()
+    db.refresh(db_channel)
+    
+    return db_channel
+
+
+async def deactivate_channel(db: Session, channel_id: UUID) -> Optional[models.Channel]:
+    """
+    Deactivate channel.
+    
+    Args:
+        db: Database session
+        channel_id: Channel UUID
+        
+    Returns:
+        Updated channel model or None if not found
+    """
+    db_channel = await get_channel(db, channel_id)
+    if not db_channel:
+        return None
+    
+    db_channel.is_active = False
+    
+    db.commit()
+    db.refresh(db_channel)
+    
+    return db_channel
+
+
+async def activate_channel(db: Session, channel_id: UUID) -> Optional[models.Channel]:
+    """
+    Activate channel.
+    
+    Args:
+        db: Database session
+        channel_id: Channel UUID
+        
+    Returns:
+        Updated channel model or None if not found
+    """
+    db_channel = await get_channel(db, channel_id)
+    if not db_channel:
+        return None
+    
+    db_channel.is_active = True
+    
+    db.commit()
+    db.refresh(db_channel)
+    
+    return db_channel
