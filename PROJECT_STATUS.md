@@ -1,7 +1,7 @@
 # Ohmatdyt CRM - Project Status
 
 **Last Updated:** October 28, 2025
-**Latest Completed:** BE-010 - Change Case Status (IN_PROGRESS -> NEEDS_INFO|REJECTED|DONE)
+**Latest Completed:** FE-001 - Next.js Skeleton + Ant Design + Redux Toolkit
 
 ## Overall Progress
 
@@ -21,8 +21,18 @@
 | BE-010 | Change Case Status (IN_PROGRESS -> NEEDS_INFO|REJECTED|DONE) | ✅ COMPLETED | Oct 28, 2025 |
 | BE-011 | Email Notifications | 🔄 PENDING | - |
 
+### Phase 1 (MVP) - Frontend Implementation
+
+| Task ID | Description | Status | Date Completed |
+|---------|-------------|--------|----------------|
+| FE-001 | Next.js Skeleton + Ant Design + Redux Toolkit | ✅ COMPLETED | Oct 28, 2025 |
+| FE-002 | Cases List Page | 🔄 PENDING | - |
+| FE-003 | Case Detail Page | 🔄 PENDING | - |
+| FE-004 | Create Case Form | 🔄 PENDING | - |
+
 ### Technology Stack
-- **Backend:** Python, Django 5+, FastAPI (Django-Ninja), Celery
+- **Backend:** Python, FastAPI, Celery, SQLAlchemy
+- **Frontend:** Next.js 14, React 18, TypeScript, Ant Design 5, Redux Toolkit
 - **Database:** PostgreSQL
 - **Cache/Queue:** Redis
 - **Auth:** JWT
@@ -1441,6 +1451,357 @@ Implemented functionality for executors to take ownership of NEW cases, changing
 - Status history provides audit trail for compliance
 - Celery task is fault-tolerant with retry mechanism
 - Notification does not block API response (async)
+
+---
+
+## 🎨 FE-001: Next.js Skeleton + Ant Design + Redux Toolkit - COMPLETED
+
+**Date Started:** October 28, 2025
+**Date Completed:** October 28, 2025
+**Status:** ✅ COMPLETED
+
+### Objectives
+
+Створити базовий скелет фронтенд-додатку з Next.js 14, Ant Design 5 і Redux Toolkit для глобального стейт-менеджменту.
+
+### Implementation Details
+
+#### 1. Встановлення залежностей
+
+**Modified Files:**
+- `frontend/package.json`
+
+**New Dependencies:**
+- `antd@5.11.0` - UI компоненти
+- `@ant-design/icons@5.2.6` - Іконки
+- `@reduxjs/toolkit@1.9.7` - State management
+- `react-redux@8.1.3` - React bindings для Redux
+- `axios@1.6.0` - HTTP клієнт
+- `dayjs@1.11.10` - Date/time утиліта
+
+#### 2. Redux Store Configuration
+
+**Created Files:**
+
+**`frontend/src/store/index.ts`** (25 lines)
+- Налаштований Redux store з TypeScript
+- Підключені reducers: auth, cases
+- Експортовані типи RootState і AppDispatch
+
+```typescript
+export const store = configureStore({
+  reducer: {
+    auth: authReducer,
+    cases: casesReducer,
+  },
+});
+```
+
+**`frontend/src/store/slices/authSlice.ts`** (121 lines)
+- Типи: User, AuthState
+- Actions: loginStart, loginSuccess, loginFailure, logout, updateTokens, clearError
+- Selectors: selectAuth, selectUser, selectIsAuthenticated, selectAuthLoading
+
+Стан авторизації:
+```typescript
+interface AuthState {
+  user: User | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  isLoading: boolean;
+  error: string | null;
+}
+```
+
+**`frontend/src/store/slices/casesSlice.ts`** (169 lines)
+- Типи: Case, CaseStatus, CasesState
+- Actions: fetchCasesStart/Success/Failure, fetchCaseStart/Success/Failure, createCaseStart/Success/Failure, updateCaseSuccess, clearCurrentCase, clearError, resetCasesState
+- Selectors: selectCases, selectCurrentCase, selectCasesLoading, selectCasesError, selectCasesTotal
+
+Стан звернень:
+```typescript
+interface CasesState {
+  cases: Case[];
+  currentCase: Case | null;
+  isLoading: boolean;
+  error: string | null;
+  total: number;
+  page: number;
+  pageSize: number;
+}
+```
+
+**`frontend/src/store/hooks.ts`** (11 lines)
+- Типізовані хуки: useAppDispatch, useAppSelector
+- Використання замість стандартних useDispatch/useSelector
+
+#### 3. Theme Configuration
+
+**`frontend/src/config/theme.ts`** (77 lines)
+- Налаштована кастомна тема Ant Design
+- Українська локалізація (uk_UA)
+- Кольорова палітра: primary (#1890ff), success (#52c41a), warning (#faad14), error (#ff4d4f)
+- Налаштовані компоненти: Layout, Menu, Button, Input, Select, Table, Card
+- Темна тема для сайдбару (#001529)
+
+#### 4. Layout Components
+
+**`frontend/src/components/Layout/MainLayout.tsx`** (190 lines)
+
+Головний layout з:
+- **Sidebar (Sider)**
+  - Згортається/розгортається
+  - Логотип "Ohmatdyt CRM"
+  - Темна тема (#001529)
+  - Меню навігації:
+    - Головна (/dashboard)
+    - Звернення (/cases)
+    - Адміністрування (випадаюче):
+      - Користувачі
+      - Категорії
+      - Канали звернень
+
+- **Header**
+  - Кнопка згортання сайдбару
+  - Іконка сповіщень (BellOutlined)
+  - Dropdown профілю користувача:
+    - Аватар
+    - Ім'я користувача
+    - Пункти меню: Профіль, Вийти
+
+- **Content**
+  - Білий фон
+  - Заокруглені кути (borderRadius: 8px)
+  - Відступи (margin: 24px 16px, padding: 24px)
+
+Функціонал:
+- Автоматичне виділення активного пункту меню (router.pathname)
+- Dispatch logout при виході
+- Інтеграція з Redux (selectUser)
+
+#### 5. Application Setup
+
+**`frontend/src/pages/_app.tsx`** (21 lines)
+- Provider для Redux store
+- ConfigProvider для Ant Design (тема + локалізація)
+- Імпорт reset.css від Ant Design
+
+#### 6. Pages
+
+**`frontend/src/pages/login.tsx`** (153 lines)
+
+Сторінка входу:
+- Form з полями email і password
+- Валідація (required, email format)
+- Loading стан під час запиту
+- Error handling з відображенням помилки
+- Gradient фон (linear-gradient: #667eea -> #764ba2)
+- Центрована Card (400px width)
+- Інтеграція з API: POST /api/auth/login
+- Redirect на /dashboard після успішного входу
+
+**`frontend/src/pages/dashboard.tsx`** (92 lines)
+
+Головна панель (Dashboard):
+- Використовує MainLayout
+- Row з 4 статистичними картками:
+  - Всього звернень (FileTextOutlined, #1890ff)
+  - В роботі (ClockCircleOutlined, #faad14)
+  - Потребують інформації (ExclamationCircleOutlined, #ff4d4f)
+  - Завершено (CheckCircleOutlined, #52c41a)
+- Card "Останні звернення" (поки порожня, TODO: таблиця)
+- Responsive grid (xs/sm/lg breakpoints)
+
+### Files Created
+
+```
+frontend/
+├── src/
+│   ├── store/
+│   │   ├── index.ts                    # Redux store config
+│   │   ├── hooks.ts                    # Typed hooks
+│   │   └── slices/
+│   │       ├── authSlice.ts           # Auth state
+│   │       └── casesSlice.ts          # Cases state
+│   ├── config/
+│   │   └── theme.ts                    # Ant Design theme
+│   ├── components/
+│   │   └── Layout/
+│   │       └── MainLayout.tsx         # Main layout
+│   └── pages/
+│       ├── _app.tsx                    # App wrapper
+│       ├── login.tsx                   # Login page
+│       └── dashboard.tsx               # Dashboard page
+└── install-frontend.bat                # NPM install script
+```
+
+**Total:** 9 files created, 1 file modified (package.json)
+
+### Current State
+
+✅ **Completed:**
+- Налаштовані всі необхідні npm залежності
+- Створений Redux store з auth і cases slices
+- Налаштована тема Ant Design з українською локалізацією
+- Створений головний Layout з навігацією
+- Створена сторінка входу (login)
+- Створена головна панель (dashboard)
+- Інтеграція Redux з React компонентами
+- Встановлено npm залежності (422 packages)
+- Налаштовано path aliases в tsconfig.json
+- **Dev сервер успішно запущено на http://localhost:3001**
+- Всі TypeScript помилки виправлені
+- Проект готовий до розробки
+
+✅ **Build Status:**
+- Dev mode: ✅ Working (localhost:3001)
+- Production build: ⚠️ Known issue with rc-util module (not critical for development)
+
+### Technical Decisions
+
+1. **TypeScript Everywhere**
+   - Всі компоненти і хуки типізовані
+   - Використання type safety для Redux (RootState, AppDispatch)
+   - Інтерфейси для всіх моделей даних
+
+2. **Redux Toolkit**
+   - Спрощений синтаксис (createSlice)
+   - Вбудований Redux DevTools
+   - Immer для immutable updates
+
+3. **Ant Design 5**
+   - Сучасні компоненти з гарним UX
+   - Вбудована підтримка темної теми
+   - Українська локалізація out-of-the-box
+
+4. **Next.js 14**
+   - Pages Router (не App Router) для простоти
+   - SSR capabilities для майбутнього SEO
+   - Автоматичний code splitting
+
+### Known Issues
+
+1. **Production Build Error (rc-util)**
+   - Помилка з модулем rc-util при production build
+   - Dev режим працює без проблем
+   - Не критично для поточного етапу розробки
+   - Можливе рішення: оновлення Ant Design або перевстановлення залежностей
+
+2. **PowerShell Execution Policy**
+   - npm команди не виконуються безпосередньо через PowerShell
+   - Вирішення: створені .bat скрипти для запуску команд
+   - Доступні скрипти:
+     - `install-frontend.bat` - встановлення залежностей
+     - `dev-frontend.bat` - запуск dev сервера
+     - `build-frontend.bat` - production build
+     - `clean-install.bat` - очистка і перевстановлення
+
+### Next Steps (FE-002 onwards)
+
+1. **FE-002: Cases List Page**
+   - Таблиця звернень з пагінацією
+   - Фільтри по статусу, категорії, каналу
+   - Пошук по тексту
+   - Сортування по полях
+
+2. **FE-003: Case Detail Page**
+   - Перегляд деталей звернення
+   - Історія змін статусу
+   - Коментарі (публічні/внутрішні)
+   - Прикріплені файли
+
+3. **FE-004: Create Case Form**
+   - Форма створення звернення
+   - Upload файлів (multipart)
+   - Вибір категорії/підкатегорії/каналу
+   - Валідація даних
+
+4. **API Integration**
+   - Axios instance з base URL
+   - Interceptors для JWT refresh
+   - Error handling (401, 403, 500)
+   - Loading states
+
+5. **Protected Routes**
+   - Middleware для перевірки авторизації
+   - Redirect на /login якщо немає токену
+   - Перевірка ролей для admin routes
+
+### Notes
+
+- Проект використовує Pages Router (не App Router) для сумісності з Redux
+- Всі тексти українською мовою
+- Дизайн адаптивний (responsive grid)
+- Темна тема для сайдбару забезпечує контраст
+- Layout використовує React Context через Redux Provider
+- Форма логіну готова до інтеграції з реальним API
+- TODO коментарі вказують на місця для майбутнього розвитку
+
+### Docker Integration
+
+**Створені файли:**
+- `docker-compose.dev.yml` - Override для development з live reload
+- `start-dev.bat` - Запуск всього проекту (Full Stack)
+- `docker-frontend.bat` - Запуск Frontend + Backend API
+- `docker-stop.bat` - Зупинка всіх сервісів
+- `docker-logs.bat` - Перегляд логів (з параметром для конкретного сервісу)
+- `docker-rebuild.bat` - Повна перебудова проекту
+- `DOCKER_SCRIPTS.md` - Документація по всіх батниках
+- `DOCKER_GUIDE.md` - Повна документація по роботі з Docker
+
+**Видалені файли (локальна розробка):**
+- ❌ `install-frontend.bat` - не потрібен (Docker сам встановлює)
+- ❌ `dev-frontend.bat` - не потрібен (працюємо через Docker)
+- ❌ `build-frontend.bat` - не потрібен (Docker білдить)
+- ❌ `clean-install.bat` - не потрібен (є docker-rebuild.bat)
+
+**Запуск через Docker:**
+
+```bash
+# Весь проект
+start-dev.bat
+
+# Тільки Frontend + Backend
+docker-frontend.bat
+
+# Зупинка
+docker-stop.bat
+
+# Логи
+docker-logs.bat frontend
+```
+
+**Features:**
+- ✅ Hot Module Replacement (HMR) працює в Docker
+- ✅ Live reload при зміні файлів
+- ✅ Volume mounting для src/, public/, config files
+- ✅ Налаштований reverse proxy через Nginx
+- ✅ Environment variables через .env
+- ✅ Multi-stage Dockerfile (dev/prod)
+- ✅ Зручні батники для всіх операцій
+
+**Доступ:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000  
+- Nginx: http://localhost:80
+
+**Команди:**
+```bash
+# Статус
+docker-compose ps
+
+# Shell
+docker-compose exec frontend sh
+
+# Встановити пакет
+docker-compose exec frontend npm install package-name
+
+# Перебудова
+docker-rebuild.bat
+```
+
+
+
 
 
 

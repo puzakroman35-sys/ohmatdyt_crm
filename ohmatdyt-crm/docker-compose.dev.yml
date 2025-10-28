@@ -1,0 +1,22 @@
+name: ${COMPOSE_PROJECT_NAME:-ohmatdyt_crm}
+
+services:
+  # Override frontend для development
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/next.config.js:/app/next.config.js
+      # Exclude node_modules from volume
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:${API_PORT}
+      - WATCHPACK_POLLING=true
+    command: npm run dev

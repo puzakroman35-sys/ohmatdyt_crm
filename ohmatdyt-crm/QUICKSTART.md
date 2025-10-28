@@ -6,26 +6,62 @@ All infrastructure is set up and tested. The project is ready for backend and fr
 
 ## 🚀 Quick Start
 
-### 1. Start the Project
-```powershell
-cd d:\AI_boost\ohmatdyt_crm\ohmatdyt-crm
-docker compose --env-file .env up -d --build
+### Запуск через Docker 🐳
+
+**Весь проект (Full Stack):**
+```bash
+start-dev.bat
 ```
 
-### 2. Verify Everything Works
+**Тільки Frontend + Backend:**
+```bash
+docker-frontend.bat
+```
+
+**Зупинка:**
+```bash
+docker-stop.bat
+```
+
+**Логи:**
+```bash
+docker-logs.bat          # Всі сервіси
+docker-logs.bat frontend # Тільки frontend
+docker-logs.bat api      # Тільки API
+```
+
+**Доступ до сервісів:**
+- **Frontend:** http://localhost:3000
+- **API:** http://localhost:8000
+- **API Docs:** http://localhost:8000/docs
+- **Nginx:** http://localhost:80
+
+### Корисні команди
+
+```bash
+# Статус сервісів
+docker-compose ps
+
+# Shell в контейнері
+docker-compose exec frontend sh
+docker-compose exec api sh
+
+# Перезапуск сервісу
+docker-compose restart frontend
+
+# Повна перебудова
+docker-rebuild.bat
+```
+
+### Перевірка роботи
+
 ```powershell
 # Check status
-docker compose ps
+docker-compose ps
 
 # Run smoke tests
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-simple.ps1
 ```
-
-### 3. Access Services
-- **API:** http://localhost:8000
-- **API Documentation:** http://localhost:8000/docs
-- **Frontend:** http://localhost:3000
-- **Nginx (Proxy):** http://localhost:8080
 
 ## 📋 Common Commands
 
@@ -171,6 +207,23 @@ docker compose --env-file .env up -d
 
 ## 📚 Next Steps
 
+### 📜 Docker Scripts
+- 🚀 `start-dev.bat` - Запуск всього проекту
+- 🎨 `docker-frontend.bat` - Тільки Frontend + API
+- ⏹️ `docker-stop.bat` - Зупинка сервісів
+- 📋 `docker-logs.bat [service]` - Перегляд логів
+- 🔄 `docker-rebuild.bat` - Повна перебудова
+
+Детальніше: [Docker Scripts Guide](./DOCKER_SCRIPTS.md)
+
+### Quick Links
+- 📖 [Docker Guide](./DOCKER_GUIDE.md) - Повна документація по Docker
+- 📖 [Docker Scripts](./DOCKER_SCRIPTS.md) - Опис всіх батників
+- 📖 [FE-001 README](./FE-001_README.md) - Документація фронтенду
+- 📖 [Full README](./README.md) - Complete documentation
+- 📖 [Implementation Status](./IMPLEMENTATION_STATUS.md) - Detailed status
+- 📖 [Project Status](../PROJECT_STATUS.md) - Загальний статус проекту
+
 ### ✅ Completed Backend Features (Фаза 1)
 - ✅ BE-001: User Model & Authentication
 - ✅ BE-002: JWT Authentication
@@ -178,20 +231,33 @@ docker compose --env-file .env up -d
 - ✅ BE-004: Cases Model & CRUD
 - ✅ BE-005: Attachments (File Upload)
 - ✅ BE-006: Create Case (multipart) + Email Trigger
+- ✅ BE-007: Case Filtering & Search
+- ✅ BE-008: Case Detail (History, Comments, Files)
+- ✅ BE-009: Take Case Into Work (EXECUTOR)
+- ✅ BE-010: Change Case Status (IN_PROGRESS -> NEEDS_INFO|REJECTED|DONE)
+
+### ✅ Completed Frontend Features (Фаза 1)
+- ✅ FE-001: Next.js Skeleton + Ant Design + Redux Toolkit
+  - Redux store з auth і cases slices
+  - Ant Design тема з українською локалізацією
+  - MainLayout з навігацією
+  - Сторінка входу (login)
+  - Dashboard з статистикою
+  - Docker integration з HMR
 
 ### 🔄 Pending Backend Features (Фаза 1)
-- BE-007: Case Filtering & Search
-- BE-008: Case Assignment Logic
-- BE-009: Email Notifications
-- BE-010: Escalation System
-- BE-013: Celery/Redis Integration (full)
-- BE-014: SMTP Integration (full)
+- BE-011: Email Notifications (повна реалізація)
+- BE-012: Case Assignment to Executor
+- BE-013: Case Status Workflow
+- BE-014: Internal/Public Comments
+- BE-015: Case History & Audit Log
 
-### Frontend Development (Фаза 1)
-- FE-001: UI components & routing
-- FE-002: Authentication pages
-- FE-003: Case management UI
-- FE-004: Dashboard
+### 🔄 Pending Frontend Features (Фаза 1)
+- FE-002: Cases List Page (таблиця, фільтри, пошук)
+- FE-003: Case Detail Page (перегляд, коментарі, файли)
+- FE-004: Create Case Form (форма створення + upload)
+- FE-005: Case Actions (взяти в роботу, зміна статусу)
+- FE-006: User Management (CRUD користувачів)
 
 ### Infrastructure (Фаза 2)
 - INF-003: CI/CD pipeline

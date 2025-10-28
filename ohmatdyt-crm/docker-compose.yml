@@ -93,7 +93,15 @@ services:
         condition: service_started
     ports:
       - "${FRONTEND_PORT}:3000"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/next.config.js:/app/next.config.js
     restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8000
 
   nginx:
     image: nginx:1.25-alpine
