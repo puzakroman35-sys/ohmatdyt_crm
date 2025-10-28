@@ -294,6 +294,15 @@ class AttachmentListResponse(BaseModel):
 
 # ==================== Comment Schemas ====================
 
+class CommentCreate(BaseModel):
+    """Schema for creating a new comment"""
+    text: str
+    is_internal: bool = False
+    
+    class Config:
+        from_attributes = True
+
+
 class CommentResponse(BaseModel):
     """Schema for comment response"""
     id: str

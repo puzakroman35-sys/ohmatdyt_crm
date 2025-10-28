@@ -331,6 +331,145 @@ def send_case_status_changed_notification(
         raise self.retry(exc=exc, countdown=retry_delay)
 
 
+@celery.task(
+    name="app.celery_app.send_comment_notification",
+    bind=True,
+    max_retries=5,
+    default_retry_delay=60  # 1 minute
+)
+def send_comment_notification(
+    self,
+    case_id: str,
+    case_public_id: int,
+    comment_id: str,
+    comment_text: str,
+    is_internal: bool,
+    author_id: str,
+    author_name: str,
+    case_author_id: str,
+    responsible_id: str | None,
+    category_id: str
+):
+    """
+    Send email notification when comment is added to case.
+    
+    Email розсилка згідно правил:
+    - Публічні коментарі → автор звернення + відповідальний виконавець
+    - Внутрішні коментарі → виконавці категорії + адміни (БЕЗ автора-оператора)
+    
+    Args:
+        case_id: UUID звернення
+        case_public_id: 6-значний публічний ID
+        comment_id: UUID коментаря
+        comment_text: Текст коментаря
+        is_internal: Чи є коментар внутрішнім
+        author_id: UUID автора коментаря
+        author_name: Повне ім'я автора
+        case_author_id: UUID автора звернення (оператора)
+        responsible_id: UUID відповідального виконавця (може бути None)
+        category_id: UUID категорії звернення
+    
+    Note: Placeholder implementation. Full email functionality in BE-014.
+    """
+    try:
+        from app.database import SessionLocal
+        
+        db = SessionLocal()
+        
+        try:
+            recipients = []
+            
+            if is_internal:
+                # Внутрішній коментар: відправляємо виконавцям категорії + адмінам
+                # БЕЗ автора звернення (оператора)
+                print(f"[NOTIFICATION] Internal comment on case #{case_public_id}")
+                
+                # Отримати всіх EXECUTOR та ADMIN (пізніше буде фільтр по категорії)
+                executors_admins = db.execute(
+                    "SELECT * FROM users WHERE role IN ('EXECUTOR', 'ADMIN') AND is_active = true"
+                ).fetchall()
+                
+                for user in executors_admins:
+                    if user.id != author_id:  # Не надсилати автору коментаря
+                        recipients.append({
+                            "email": user.email,
+                            "full_name": user.full_name,
+                            "role": user.role
+                        })
+                
+                print(f"[NOTIFICATION] Notifying {len(recipients)} executor(s)/admin(s)")
+                
+            else:
+                # Публічний коментар: відправляємо автору звернення + відповідальному
+                print(f"[NOTIFICATION] Public comment on case #{case_public_id}")
+                
+                # Автор звернення (OPERATOR)
+                case_author = db.execute(
+                    f"SELECT * FROM users WHERE id = '{case_author_id}'"
+                ).first()
+                
+                if case_author and case_author.id != author_id:
+                    recipients.append({
+                        "email": case_author.email,
+                        "full_name": case_author.full_name,
+                        "role": "Case Author"
+                    })
+                
+                # Відповідальний виконавець
+                if responsible_id:
+                    responsible = db.execute(
+                        f"SELECT * FROM users WHERE id = '{responsible_id}'"
+                    ).first()
+                    
+                    if responsible and responsible.id != author_id:
+                        recipients.append({
+                            "email": responsible.email,
+                            "full_name": responsible.full_name,
+                            "role": "Responsible"
+                        })
+                
+                print(f"[NOTIFICATION] Notifying {len(recipients)} user(s)")
+            
+            # Log recipients (placeholder for actual email sending)
+            print(f"[NOTIFICATION] Comment by: {author_name}")
+            print(f"[NOTIFICATION] Comment type: {'Internal' if is_internal else 'Public'}")
+            print(f"[NOTIFICATION] Comment preview: {comment_text[:100]}...")
+            
+            for recipient in recipients:
+                print(f"[NOTIFICATION] Would send email to: {recipient['email']} ({recipient['full_name']}) - {recipient['role']}")
+                # TODO: Implement actual email sending in BE-014
+                # send_email(
+                #     to=recipient["email"],
+                #     subject=f"New comment on case #{case_public_id}",
+                #     template="new_comment",
+                #     context={
+                #         "case_public_id": case_public_id,
+                #         "comment_text": comment_text,
+                #         "is_internal": is_internal,
+                #         "author_name": author_name,
+                #         "recipient_name": recipient["full_name"],
+                #     }
+                # )
+            
+            return {
+                "status": "success",
+                "case_id": case_id,
+                "public_id": case_public_id,
+                "comment_id": comment_id,
+                "is_internal": is_internal,
+                "recipients_notified": len(recipients)
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as exc:
+        print(f"Error sending comment notification for case {case_public_id}: {exc}")
+        
+        # Exponential backoff retry
+        retry_delay = 60 * (2 ** self.request.retries)
+        raise self.retry(exc=exc, countdown=retry_delay)
+
 
 # Auto-discover tasks from other modules (will be added later)
 # celery.autodiscover_tasks(['app.tasks'])

@@ -1442,3 +1442,76 @@ def change_case_status(
     return db_case
 
 
+# ==================== Comment CRUD ====================
+
+def create_comment(
+    db: Session,
+    case_id: UUID,
+    author_id: UUID,
+    text: str,
+    is_internal: bool = False
+) -> models.Comment:
+    """
+    Створює новий коментар до звернення.
+    
+    Args:
+        db: Database session
+        case_id: UUID звернення
+        author_id: UUID автора коментаря
+        text: Текст коментаря
+        is_internal: Чи є коментар внутрішнім (за замовчуванням False)
+        
+    Returns:
+        Створений коментар
+    """
+    db_comment = models.Comment(
+        case_id=case_id,
+        author_id=author_id,
+        text=text,
+        is_internal=is_internal
+    )
+    
+    db.add(db_comment)
+    db.commit()
+    db.refresh(db_comment)
+    
+    return db_comment
+
+
+def get_comments_by_case(
+    db: Session,
+    case_id: UUID,
+    user_role: models.UserRole,
+    user_id: Optional[UUID] = None
+) -> list[models.Comment]:
+    """
+    Отримує коментарі звернення з урахуванням RBAC.
+    
+    RBAC Rules:
+    - OPERATOR: Бачить тільки публічні коментарі
+    - EXECUTOR: Бачить всі коментарі (публічні + внутрішні)
+    - ADMIN: Бачить всі коментарі
+    
+    Args:
+        db: Database session
+        case_id: UUID звернення
+        user_role: Роль користувача
+        user_id: UUID користувача (опціонально)
+        
+    Returns:
+        Список коментарів з урахуванням прав доступу
+    """
+    query = select(models.Comment).where(models.Comment.case_id == case_id)
+    
+    # RBAC фільтрація
+    if user_role == models.UserRole.OPERATOR:
+        # OPERATOR бачить тільки публічні коментарі
+        query = query.where(models.Comment.is_internal == False)
+    # EXECUTOR та ADMIN бачать всі коментарі
+    
+    # Сортування за датою створення
+    query = query.order_by(models.Comment.created_at.asc())
+    
+    comments = db.execute(query).scalars().all()
+    return list(comments)
+
