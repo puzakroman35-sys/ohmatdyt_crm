@@ -107,10 +107,11 @@ def get_users(
     skip: int = 0,
     limit: int = 100,
     role: Optional[models.UserRole] = None,
-    is_active: Optional[bool] = None
-) -> list[models.User]:
+    is_active: Optional[bool] = None,
+    order_by: Optional[str] = "username"
+) -> tuple[list[models.User], int]:
     """
-    Get list of users with filtering and pagination.
+    Get list of users with filtering, pagination, and sorting.
     
     Args:
         db: Database session
@@ -118,9 +119,10 @@ def get_users(
         limit: Maximum number of records to return
         role: Filter by user role
         is_active: Filter by active status
+        order_by: Sort field (prefix with - for descending, e.g., -created_at)
         
     Returns:
-        List of user models
+        Tuple of (list of users, total count)
     """
     query = select(models.User)
     
@@ -130,9 +132,32 @@ def get_users(
     if is_active is not None:
         query = query.where(models.User.is_active == is_active)
     
+    # Get total count
+    from sqlalchemy import func
+    count_query = select(func.count()).select_from(query.subquery())
+    total = db.execute(count_query).scalar() or 0
+    
+    # Apply sorting
+    if order_by:
+        if order_by.startswith('-'):
+            # Descending order
+            field_name = order_by[1:]
+            if hasattr(models.User, field_name):
+                query = query.order_by(getattr(models.User, field_name).desc())
+            else:
+                query = query.order_by(models.User.username.asc())
+        else:
+            # Ascending order
+            if hasattr(models.User, order_by):
+                query = query.order_by(getattr(models.User, order_by).asc())
+            else:
+                query = query.order_by(models.User.username.asc())
+    else:
+        query = query.order_by(models.User.username.asc())
+    
     query = query.offset(skip).limit(limit)
     
-    return list(db.execute(query).scalars().all())
+    return list(db.execute(query).scalars().all()), total
 
 
 def update_user(
@@ -1515,3 +1540,104 @@ def get_comments_by_case(
     comments = db.execute(query).scalars().all()
     return list(comments)
 
+
+# ==================== User Management CRUD (ADMIN) ====================
+
+def reset_user_password(
+    db: Session,
+    user_id: UUID,
+    new_password: str
+) -> Optional[models.User]:
+    """
+    Скидає пароль користувача на новий (тимчасовий).
+    
+    Args:
+        db: Database session
+        user_id: UUID користувача
+        new_password: Новий пароль (буде захешований)
+        
+    Returns:
+        Оновлену модель користувача або None якщо не знайдено
+    """
+    db_user = get_user(db, user_id)
+    if not db_user:
+        return None
+    
+    db_user.password_hash = hash_password(new_password)
+    
+    db.commit()
+    db.refresh(db_user)
+    
+    return db_user
+
+
+def get_user_active_cases(
+    db: Session,
+    user_id: UUID
+) -> list[models.Case]:
+    """
+    Отримує список активних звернень користувача (як виконавця).
+    
+    Активні звернення: статус IN_PROGRESS або NEEDS_INFO
+    
+    Args:
+        db: Database session
+        user_id: UUID користувача (виконавця)
+        
+    Returns:
+        Список активних звернень
+    """
+    query = select(models.Case).where(
+        models.Case.responsible_id == user_id,
+        models.Case.status.in_([models.CaseStatus.IN_PROGRESS, models.CaseStatus.NEEDS_INFO])
+    )
+    
+    cases = db.execute(query).scalars().all()
+    return list(cases)
+
+
+def deactivate_user_with_check(
+    db: Session,
+    user_id: UUID,
+    force: bool = False
+) -> tuple[bool, Optional[str], Optional[list[str]]]:
+    """
+    Деактивує користувача з перевіркою активних звернень.
+    
+    Для EXECUTOR: перевіряє наявність активних звернень (IN_PROGRESS, NEEDS_INFO).
+    Якщо є активні звернення і force=False, повертає помилку зі списком.
+    
+    Args:
+        db: Database session
+        user_id: UUID користувача
+        force: Примусова деактивація (за замовчуванням False)
+        
+    Returns:
+        Tuple (success, error_message, active_case_ids)
+        - success: True якщо деактивовано успішно
+        - error_message: Повідомлення про помилку (якщо є)
+        - active_case_ids: Список UUID активних звернень (якщо є)
+    """
+    db_user = get_user(db, user_id)
+    if not db_user:
+        return False, "User not found", None
+    
+    # Перевірка активних звернень для EXECUTOR
+    if db_user.role == models.UserRole.EXECUTOR and not force:
+        active_cases = get_user_active_cases(db, user_id)
+        
+        if active_cases:
+            case_ids = [str(case.id) for case in active_cases]
+            error_msg = (
+                f"Cannot deactivate user '{db_user.username}': "
+                f"{len(active_cases)} active case(s) found. "
+                f"Please reassign or complete these cases first, or use force=true."
+            )
+            return False, error_msg, case_ids
+    
+    # Деактивація користувача
+    db_user.is_active = False
+    db.commit()
+    db.refresh(db_user)
+    
+    return True, None, None

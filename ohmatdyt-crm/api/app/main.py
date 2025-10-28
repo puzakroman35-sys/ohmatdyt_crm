@@ -1,15 +1,18 @@
 import os
+import json
+from datetime import datetime
 from uuid import UUID
-from typing import Optional
+from typing import Optional, Any
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic_settings import BaseSettings
 from sqlalchemy.orm import Session
 
 from app import crud, schemas, models
 from app.database import get_db, check_db_connection
 from app.dependencies import get_current_user, require_admin, get_current_active_user
-from app.routers import auth, categories, channels, attachments, cases, comments
+from app.routers import auth, categories, channels, attachments, cases, comments, users
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
@@ -27,12 +30,56 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+
+# Custom JSON encoder для UUID та datetime
+class CustomJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles UUID and datetime objects"""
+    def default(self, obj: Any) -> Any:
+        if isinstance(obj, UUID):
+            return str(obj)
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+
+class CustomJSONResponse(JSONResponse):
+    """Custom JSONResponse that uses CustomJSONEncoder"""
+    def render(self, content: Any) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":"),
+            cls=CustomJSONEncoder,
+        ).encode("utf-8")
+
+
+def serialize_user(db_user: models.User) -> dict:
+    """Convert SQLAlchemy User model to dict with UUID as string.
+    
+    This helper is needed because Pydantic 2.x validates response_model
+    BEFORE JSON serialization, causing UUID validation errors.
+    """
+    return {
+        "id": str(db_user.id),
+        "username": db_user.username,
+        "email": db_user.email,
+        "full_name": db_user.full_name,
+        "role": db_user.role,
+        "is_active": db_user.is_active,
+        "created_at": db_user.created_at,
+        "updated_at": db_user.updated_at,
+    }
+
+
 app = FastAPI(
     title="Ohmatdyt CRM API",
     description="CRM system for Ohmatdyt hospital",
     version="0.1.0",
     docs_url="/docs" if settings.APP_ENV == "development" else None,
     redoc_url="/redoc" if settings.APP_ENV == "development" else None,
+    default_response_class=CustomJSONResponse,  # Use custom JSON encoder
 )
 
 # CORS configuration
@@ -52,6 +99,7 @@ app.include_router(channels.router)
 app.include_router(attachments.router)
 app.include_router(cases.router)
 app.include_router(comments.router)
+app.include_router(users.router, prefix="/api")  # User management (ADMIN)
 
 @app.get("/")
 async def root():
@@ -108,7 +156,7 @@ async def create_user(
     """
     try:
         db_user = crud.create_user(db, user)
-        return db_user
+        return serialize_user(db_user)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -122,7 +170,7 @@ async def get_current_user_endpoint(
     
     Requires valid JWT access token in Authorization header.
     """
-    return current_user
+    return serialize_user(current_user)
 
 
 @app.get("/api/users/{user_id}", response_model=schemas.UserResponse)
@@ -146,7 +194,7 @@ async def get_user(
     db_user = crud.get_user(db, user_id)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return db_user
+    return serialize_user(db_user)
 
 
 @app.get("/api/users", response_model=schemas.UserListResponse)
@@ -236,7 +284,7 @@ async def update_user(
         db_user = crud.update_user(db, user_id, user_update)
         if not db_user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-        return db_user
+        return serialize_user(db_user)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -263,7 +311,7 @@ async def update_user_password(
     db_user = crud.update_user_password(db, user_id, password_update)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return db_user
+    return serialize_user(db_user)
 
 
 @app.delete("/api/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -297,7 +345,7 @@ async def deactivate_user(
     db_user = crud.deactivate_user(db, user_id)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return db_user
+    return serialize_user(db_user)
 
 
 @app.post("/api/users/{user_id}/activate", response_model=schemas.UserResponse)
@@ -314,7 +362,7 @@ async def activate_user(
     db_user = crud.activate_user(db, user_id)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return db_user
+    return serialize_user(db_user)
 
 
 # Additional routes will be added here as the project develops

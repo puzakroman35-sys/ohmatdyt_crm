@@ -1,9 +1,10 @@
 """
 Pydantic schemas for request/response validation
 """
-from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator, ConfigDict
+from typing import Optional, Any
 from datetime import datetime
+from uuid import UUID
 from app.models import UserRole, CaseStatus
 
 
@@ -18,6 +19,7 @@ class UserCreate(UserBase):
     """Schema for creating a new user"""
     password: str = Field(..., min_length=8)
     role: UserRole = UserRole.OPERATOR
+    executor_category_ids: Optional[list[str]] = Field(None, description="List of category UUIDs for EXECUTOR role")
     
     @field_validator('password')
     @classmethod
@@ -36,6 +38,15 @@ class UserCreate(UserBase):
         if not v.replace('_', '').replace('-', '').isalnum():
             raise ValueError("Username can only contain letters, numbers, underscores, and hyphens")
         return v.lower()
+    
+    @field_validator('executor_category_ids')
+    @classmethod
+    def validate_executor_categories(cls, v: Optional[list[str]], info) -> Optional[list[str]]:
+        """Validate that executor_category_ids is only provided for EXECUTOR role"""
+        role = info.data.get('role')
+        if v and role != UserRole.EXECUTOR:
+            raise ValueError("executor_category_ids can only be set for EXECUTOR role")
+        return v
 
 
 class UserUpdate(BaseModel):
@@ -43,7 +54,16 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=1, max_length=200)
     email: Optional[EmailStr] = None
     role: Optional[UserRole] = None
-    is_active: Optional[bool] = None
+    executor_category_ids: Optional[list[str]] = Field(None, description="List of category UUIDs for EXECUTOR role")
+    
+    @field_validator('executor_category_ids')
+    @classmethod
+    def validate_executor_categories(cls, v: Optional[list[str]], info) -> Optional[list[str]]:
+        """Validate that executor_category_ids is only provided for EXECUTOR role"""
+        role = info.data.get('role')
+        if v and role and role != UserRole.EXECUTOR:
+            raise ValueError("executor_category_ids can only be set for EXECUTOR role")
+        return v
 
 
 class UserPasswordUpdate(BaseModel):
@@ -64,14 +84,34 @@ class UserPasswordUpdate(BaseModel):
 
 class UserResponse(UserBase):
     """Schema for user response (excludes password)"""
-    id: str
+    id: str  # UUID converted to string
     role: UserRole
     is_active: bool
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+    
+    @model_validator(mode='before')
+    @classmethod
+    def convert_uuid_fields(cls, data):
+        """Convert UUID fields to string before validation"""
+        if hasattr(data, 'id') and isinstance(data.id, UUID):
+            # SQLAlchemy model - convert in place
+            return {
+                'id': str(data.id),
+                'username': data.username,
+                'email': data.email,
+                'full_name': data.full_name,
+                'role': data.role,
+                'is_active': data.is_active,
+                'created_at': data.created_at,
+                'updated_at': data.updated_at,
+            }
+        elif isinstance(data, dict) and 'id' in data and isinstance(data['id'], UUID):
+            # Dict - convert UUID to string
+            data['id'] = str(data['id'])
+        return data
 
 
 class UserListResponse(BaseModel):
@@ -417,3 +457,30 @@ class CaseStatusChangeRequest(BaseModel):
             )
         return v
 
+
+# ==================== User Management Schemas (ADMIN) ====================
+
+class ResetPasswordResponse(BaseModel):
+    """Schema for reset password response"""
+    message: str
+    temp_password: str
+
+
+class DeactivateUserRequest(BaseModel):
+    """Schema for deactivate user request (optional validation)"""
+    force: bool = Field(False, description="Force deactivation even if user has active cases")
+
+
+class DeactivateUserResponse(BaseModel):
+    """Schema for deactivate user response"""
+    message: str
+    user_id: str
+    active_cases: Optional[list[str]] = Field(None, description="List of active case IDs if deactivation was blocked")
+
+
+class ActiveCasesResponse(BaseModel):
+    """Schema for active cases response"""
+    user_id: str
+    username: str
+    active_cases_count: int
+    case_ids: list[str]

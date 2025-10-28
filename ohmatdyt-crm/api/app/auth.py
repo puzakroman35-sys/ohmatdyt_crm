@@ -202,3 +202,28 @@ def decode_token(token: str) -> Optional[dict]:
         return jwt.decode(token, auth_settings.SECRET_KEY, algorithms=[auth_settings.ALGORITHM], options={"verify_signature": False})
     except JWTError:
         return None
+
+
+def generate_temp_password(length: int = 12) -> str:
+    """
+    Generate a temporary password for password reset.
+    
+    Args:
+        length: Length of the password (default: 12)
+        
+    Returns:
+        Random temporary password string
+    """
+    import secrets
+    import string
+    
+    # Ensure password has at least one of each required character type
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    
+    while True:
+        password = ''.join(secrets.choice(alphabet) for _ in range(length))
+        
+        # Validate password strength
+        is_valid, _ = validate_password_strength(password)
+        if is_valid:
+            return password
