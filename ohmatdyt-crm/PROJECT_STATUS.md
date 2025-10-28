@@ -1,13 +1,142 @@
+# Ohmatdyt CRM - Project Status
+
+**Last Updated:** October 28, 2025
+
+## Overall Progress
+
+### Phase 1 (MVP) - Backend Implementation
+
+| Task ID | Description | Status | Date Completed |
+|---------|-------------|--------|----------------|
+| BE-001 | User Model & Authentication | ✅ COMPLETED | Oct 28, 2025 |
+| BE-002 | JWT Authentication | ✅ COMPLETED | Oct 28, 2025 |
+| BE-003 | Categories & Channels (Directories) | ✅ COMPLETED | Oct 28, 2025 |
+| BE-004 | Cases Model & CRUD | ✅ COMPLETED | Oct 28, 2025 |
+| BE-005 | Attachments (File Upload) | ✅ COMPLETED | Oct 28, 2025 |
+| BE-006 | Comments System | 🔄 PENDING | - |
+| BE-007 | Case Filtering & Search | 🔄 PENDING | - |
+| BE-008 | Case Assignment Logic | 🔄 PENDING | - |
+| BE-009 | Email Notifications | 🔄 PENDING | - |
+| BE-010 | Escalation System | 🔄 PENDING | - |
+
+### Technology Stack
+- **Backend:** Python, Django 5+, FastAPI (Django-Ninja), Celery
+- **Database:** PostgreSQL
+- **Cache/Queue:** Redis
+- **Auth:** JWT
+- **Container:** Docker & Docker Compose
+
+### Current Database Schema
+- ✅ Users (with roles: OPERATOR, EXECUTOR, ADMIN)
+- ✅ Categories (directories)
+- ✅ Channels (directories)
+- ✅ Cases (requests with 6-digit public_id)
+- ✅ Attachments (file storage)
+- 🔄 Comments (pending)
+
+---
+
+## Detailed Implementation Status
 
 ---
 
 ##  BE-001: User Model & Authentication - COMPLETED
 
 **Date Completed:** October 28, 2025
-**Status:**  COMPLETED
+**Status:** ✅ COMPLETED
 
 Created User model with roles (OPERATOR, EXECUTOR, ADMIN), database migrations, CRUD operations, API endpoints, and default superuser.
 
+---
+
+##  BE-002: JWT Authentication - COMPLETED
+
+**Date Completed:** October 28, 2025
+**Status:** ✅ COMPLETED
+
+### Summary
+Implemented JWT-based authentication system with access and refresh tokens.
+
+### Components Implemented
+- JWT token generation and validation
+- Login endpoint with credentials verification
+- Refresh token mechanism
+- Token-based authentication middleware
+- User authentication dependencies
+- Secure password hashing with bcrypt
+
+### Files Created/Modified
+- ✅ `api/app/auth.py` - JWT utilities and password hashing
+- ✅ `api/app/dependencies.py` - Authentication dependencies
+- ✅ `api/app/routers/auth.py` - Authentication endpoints
+- ✅ `docs/JWT_AUTHENTICATION.md` - Authentication documentation
+
+---
+
+##  BE-003: Categories and Channels (Directories) - COMPLETED
+
+**Date Completed:** October 28, 2025
+**Status:** ✅ COMPLETED
+
+### Summary
+Implemented directory management for Categories and Channels with CRUD operations.
+
+### Components Implemented
+1. **Database Models** (`app/models.py`)
+   - Category model with active/inactive status
+   - Channel model with active/inactive status
+
+2. **API Endpoints**
+   - Categories CRUD: Create, Read, Update, Activate/Deactivate
+   - Channels CRUD: Create, Read, Update, Activate/Deactivate
+
+3. **RBAC Controls**
+   - Admin-only for create/update/activate/deactivate
+   - Public read access for active items
+
+### Files Created/Modified
+- ✅ `api/app/models.py` - Added Category and Channel models
+- ✅ `api/app/schemas.py` - Added category and channel schemas
+- ✅ `api/app/crud.py` - Added CRUD operations
+- ✅ `api/app/routers/categories.py` - NEW: Categories endpoints
+- ✅ `api/app/routers/channels.py` - NEW: Channels endpoints
+- ✅ Migration: `96b8766da13a_add_categories_and_channels_tables.py`
+
+---
+
+##  BE-004: Cases (Requests) Model and CRUD - COMPLETED
+
+**Date Completed:** October 28, 2025
+**Status:** ✅ COMPLETED
+
+### Summary
+Implemented Case (звернення) model with 6-digit unique public_id and full CRUD operations.
+
+### Components Implemented
+1. **Database Model** (`app/models.py`)
+   - Case model with unique 6-digit public_id (100000-999999)
+   - Foreign keys to Category, Channel, Author, Responsible
+   - Status management (NEW, IN_PROGRESS, NEEDS_INFO, REJECTED, DONE)
+   - Complete applicant information fields
+
+2. **Unique ID Generator** (`app/utils.py`)
+   - Generates unique 6-digit public_id
+   - Collision detection and retry mechanism
+
+3. **CRUD Operations**
+   - Create case with validation
+   - Get case by ID or public_id
+   - List cases with filtering
+   - Update case with permission checks
+   - Assign responsible executor
+
+### Files Created/Modified
+- ✅ `api/app/models.py` - Added Case model and CaseStatus enum
+- ✅ `api/app/schemas.py` - Added case schemas
+- ✅ `api/app/crud.py` - Added case CRUD operations
+- ✅ `api/app/utils.py` - Added public_id generator
+- ✅ Migration: `d332e58ad7a9_create_cases_table.py`
+- ✅ `test_be004.py` - Test suite
 
 ---
 
