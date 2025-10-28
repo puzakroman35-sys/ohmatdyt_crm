@@ -1,7 +1,86 @@
 # Ohmatdyt CRM - Project Status
 
 **Last Updated:** October 28, 2025
-**Latest Completed:** FE-002 - Authentication: Login, Tokens, Guards
+**Latest Completed:** FE-002 - Authentication: Login, Tokens, Guards (Fixed)
+
+## 🎯 Critical Updates (October 28, 2025 - Evening Session)
+
+### Frontend Fixes & Enhancements
+
+#### 1. Fixed Module Resolution Issues ✅
+**Problem:** `rc-util/es/utils/get` module not found error
+**Solution:**
+- Downgraded Next.js from 14.2.33 to **13.5.6** (stable)
+- Downgraded Ant Design from 5.21.0 to **5.11.5** (stable)
+- Removed problematic CSS import from `_app.tsx`
+- Cleaned Docker cache and rebuilt frontend
+
+**Result:** Frontend now loads successfully on http://localhost:3000
+
+#### 2. Login Form Improvements ✅
+**Changes:**
+- Changed field from "Email" to "Логін" (username)
+- Updated LoginForm interface: `email` → `username`
+- Updated API request to use `username` field
+- Changed placeholder from "email@example.com" to "Логін"
+
+#### 3. Fixed API Connection ✅
+**Problem:** Browser trying to access `http://api:8000` (Docker internal hostname)
+**Solution:**
+- Updated `docker-compose.yml`: `NEXT_PUBLIC_API_URL=http://localhost:8000`
+- Frontend now correctly calls `http://localhost:8000/auth/login`
+- API accessible from browser
+
+#### 4. Homepage Redirect ✅
+**Changes:**
+- Updated `index.tsx` to redirect based on authentication:
+  - Not authenticated → `/login`
+  - Authenticated → `/dashboard`
+- Removed demo content from homepage
+- Added loading spinner during redirect
+
+### Test Credentials
+
+**Administrator:**
+- Username: `admin`
+- Password: `Admin123!`
+- Role: ADMIN
+
+**Operator:**
+- Username: `operator1`
+- Password: `Operator123!`
+- Role: OPERATOR
+
+**Executor:**
+- Username: `executor1`
+- Password: `Executor123!`
+- Role: EXECUTOR
+
+### Current Working State
+
+✅ **Frontend:** Next.js 13.5.6 running on http://localhost:3000
+✅ **Backend API:** FastAPI running on http://localhost:8000
+✅ **Database:** PostgreSQL with all migrations applied
+✅ **Redis:** Running for Celery tasks
+✅ **Login Form:** Functional with username/password
+✅ **API Integration:** Frontend → Backend working
+
+### Files Modified Today (Evening Session)
+
+```
+ohmatdyt-crm/
+├── docker-compose.yml                    # Fixed NEXT_PUBLIC_API_URL
+├── frontend/
+│   ├── package.json                     # Downgraded to stable versions
+│   ├── next.config.js                   # Simplified config
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── _app.tsx                # Removed problematic CSS import
+│   │   │   ├── index.tsx               # Added auth-based redirect
+│   │   │   └── login.tsx               # Changed to username field
+│   │   └── store/slices/
+│   │       └── authSlice.ts            # Updated interfaces
+```
 
 ## Overall Progress
 

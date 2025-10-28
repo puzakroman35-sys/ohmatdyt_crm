@@ -8,7 +8,6 @@ import { Provider } from 'react-redux';
 import { ConfigProvider } from 'antd';
 import { store } from '@/store';
 import { antdConfig } from '@/config/theme';
-import 'antd/dist/reset.css';
 
 export default function App({ Component, pageProps }: AppProps) {
   return (

@@ -101,7 +101,7 @@ services:
       - ./frontend/next.config.js:/app/next.config.js
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://api:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
 
   nginx:
     image: nginx:1.25-alpine

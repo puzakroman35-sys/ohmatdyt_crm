@@ -5,7 +5,7 @@ WORKDIR /app
 # Install dependencies
 FROM base AS deps
 COPY package.json ./
-RUN npm install
+RUN npm cache clean --force && npm install
 
 # Development image
 FROM base AS dev

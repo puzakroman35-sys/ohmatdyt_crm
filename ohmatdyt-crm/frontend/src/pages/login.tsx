@@ -18,7 +18,7 @@ import {
 const { Title, Text } = Typography;
 
 interface LoginForm {
-  email: string;
+  username: string;
   password: string;
 }
 
@@ -35,20 +35,22 @@ const LoginPage: React.FC = () => {
     try {
       dispatch(loginStart());
       
-      // TODO: Замінити на реальний API запит
-      const response = await fetch('http://localhost:8000/api/auth/login', {
+      // Викликаємо API логіну (використовуємо localhost для доступу з браузера)
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({
-          username: values.email,
+        body: JSON.stringify({
+          username: values.username,
           password: values.password,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Невірний email або пароль');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Невірний логін або пароль');
       }
 
       const data = await response.json();
@@ -109,16 +111,15 @@ const LoginPage: React.FC = () => {
           autoComplete="off"
         >
           <Form.Item
-            name="email"
-            label="Email"
+            name="username"
+            label="Логін"
             rules={[
-              { required: true, message: 'Будь ласка, введіть email!' },
-              { type: 'email', message: 'Введіть коректний email!' },
+              { required: true, message: 'Будь ласка, введіть логін!' },
             ]}
           >
             <Input
               prefix={<UserOutlined />}
-              placeholder="email@example.com"
+              placeholder="Логін"
               size="large"
             />
           </Form.Item>
