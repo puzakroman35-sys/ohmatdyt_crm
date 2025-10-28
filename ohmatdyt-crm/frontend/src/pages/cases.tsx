@@ -244,9 +244,20 @@ const CasesPage: React.FC = () => {
     <AuthGuard>
       <MainLayout>
         <div style={{ padding: '24px' }}>
-          <Title level={2} style={{ marginBottom: 24 }}>
-            Звернення
-          </Title>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+            <Title level={2} style={{ margin: 0 }}>
+              Звернення
+            </Title>
+            {user?.role === 'OPERATOR' || user?.role === 'ADMIN' ? (
+              <Button
+                type="primary"
+                size="large"
+                onClick={() => router.push('/cases/create')}
+              >
+                + Створити звернення
+              </Button>
+            ) : null}
+          </div>
 
         {/* Фільтри */}
         <Card style={{ marginBottom: 24 }}>
