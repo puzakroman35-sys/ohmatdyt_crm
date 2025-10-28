@@ -38,6 +38,94 @@ def test_task(x, y):
     """Test task with parameters"""
     return x + y
 
+
+@celery.task(
+    name="app.celery_app.send_new_case_notification",
+    bind=True,
+    max_retries=5,
+    default_retry_delay=60  # 1 minute
+)
+def send_new_case_notification(self, case_id: str, case_public_id: int, category_id: str):
+    """
+    Send email notification to executors when a new case is created.
+    
+    This task is queued when an operator creates a new case.
+    It retrieves all executors for the category and sends them an email notification.
+    
+    Args:
+        case_id: UUID of the case (as string)
+        case_public_id: 6-digit public ID of the case
+        category_id: UUID of the category (as string)
+        
+    Note: This is a placeholder implementation. Full email functionality
+    will be implemented in BE-013 and BE-014.
+    """
+    try:
+        # Import here to avoid circular dependencies
+        from uuid import UUID
+        from app.database import SessionLocal
+        from app import crud
+        
+        # Create database session
+        db = SessionLocal()
+        
+        try:
+            # Get case details
+            case = db.execute(
+                f"SELECT * FROM cases WHERE id = '{case_id}'"
+            ).first()
+            
+            if not case:
+                print(f"Case {case_id} not found, skipping notification")
+                return
+            
+            # Get category details
+            category = db.execute(
+                f"SELECT * FROM categories WHERE id = '{category_id}'"
+            ).first()
+            
+            category_name = category.name if category else "Unknown"
+            
+            # Get executors (simplified - gets all active executors)
+            executors = db.execute(
+                "SELECT * FROM users WHERE role IN ('EXECUTOR', 'ADMIN') AND is_active = true"
+            ).fetchall()
+            
+            # Log notification (placeholder for actual email sending)
+            print(f"[NOTIFICATION] New case #{case_public_id} created in category '{category_name}'")
+            print(f"[NOTIFICATION] Notifying {len(executors)} executor(s)")
+            
+            for executor in executors:
+                # Placeholder for actual email sending (will be implemented in BE-014)
+                print(f"[NOTIFICATION] Would send email to: {executor.email} ({executor.full_name})")
+                # TODO: Call email sending service here
+                # send_email(
+                #     to=executor.email,
+                #     subject=f"New case #{case_public_id}",
+                #     template="new_case",
+                #     context={...}
+                # )
+            
+            return {
+                "status": "success",
+                "case_id": case_id,
+                "public_id": case_public_id,
+                "executors_notified": len(executors)
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as exc:
+        # Retry with exponential backoff
+        print(f"Error sending notification for case {case_public_id}: {exc}")
+        
+        # Calculate exponential backoff: 60s, 120s, 240s, 480s, 960s
+        retry_delay = 60 * (2 ** self.request.retries)
+        
+        raise self.retry(exc=exc, countdown=retry_delay)
+
+
 # Auto-discover tasks from other modules (will be added later)
 # celery.autodiscover_tasks(['app.tasks'])
 

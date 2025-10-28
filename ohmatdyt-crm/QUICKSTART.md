@@ -118,6 +118,22 @@ Invoke-WebRequest http://localhost:8000/health
 Invoke-WebRequest http://localhost:8080/health
 ```
 
+### Backend Tests
+```powershell
+# Test BE-006 (Case creation with files)
+.\scripts\test-be006.ps1
+
+# Test BE-005 (Attachments)
+cd api
+python test_be005.py
+cd ..
+
+# Test BE-004 (Cases CRUD)
+cd api
+python test_be004.py
+cd ..
+```
+
 ### Verify Volumes
 ```powershell
 docker volume ls | findstr ohmatdyt_crm
@@ -155,16 +171,26 @@ docker compose --env-file .env up -d
 
 ## 📚 Next Steps
 
-### Backend Development (Фаза 1)
-- BE-001: Database models & migrations
-- BE-002: User authentication & JWT
-- BE-003: Patient management API
-- BE-004: Doctor management API
+### ✅ Completed Backend Features (Фаза 1)
+- ✅ BE-001: User Model & Authentication
+- ✅ BE-002: JWT Authentication
+- ✅ BE-003: Categories & Channels (Directories)
+- ✅ BE-004: Cases Model & CRUD
+- ✅ BE-005: Attachments (File Upload)
+- ✅ BE-006: Create Case (multipart) + Email Trigger
+
+### 🔄 Pending Backend Features (Фаза 1)
+- BE-007: Case Filtering & Search
+- BE-008: Case Assignment Logic
+- BE-009: Email Notifications
+- BE-010: Escalation System
+- BE-013: Celery/Redis Integration (full)
+- BE-014: SMTP Integration (full)
 
 ### Frontend Development (Фаза 1)
 - FE-001: UI components & routing
 - FE-002: Authentication pages
-- FE-003: Patient management UI
+- FE-003: Case management UI
 - FE-004: Dashboard
 
 ### Infrastructure (Фаза 2)

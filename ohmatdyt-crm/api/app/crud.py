@@ -751,11 +751,16 @@ async def get_all_cases(
     channel_id: Optional[UUID] = None,
     author_id: Optional[UUID] = None,
     responsible_id: Optional[UUID] = None,
+    public_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    overdue: Optional[bool] = None,
+    order_by: Optional[str] = "-created_at",
     skip: int = 0,
     limit: int = 50
 ) -> tuple[list[models.Case], int]:
     """
-    Get all cases with optional filtering.
+    Get all cases with optional filtering and sorting.
     
     Args:
         db: Database session
@@ -764,15 +769,22 @@ async def get_all_cases(
         channel_id: Filter by channel
         author_id: Filter by author
         responsible_id: Filter by responsible user
+        public_id: Filter by 6-digit public ID
+        date_from: Filter by created date from (ISO format)
+        date_to: Filter by created date to (ISO format)
+        overdue: Filter overdue cases (requires SLA field - placeholder)
+        order_by: Sort field (prefix with - for descending, e.g., -created_at)
         skip: Number of records to skip (pagination)
         limit: Maximum number of records to return
         
     Returns:
         Tuple of (list of cases, total count)
     """
+    from datetime import datetime
+    
     query = select(models.Case)
     
-    # Apply filters
+    # Apply filters (AND logic)
     if status:
         query = query.where(models.Case.status == status)
     if category_id:
@@ -783,6 +795,46 @@ async def get_all_cases(
         query = query.where(models.Case.author_id == author_id)
     if responsible_id:
         query = query.where(models.Case.responsible_id == responsible_id)
+    if public_id:
+        query = query.where(models.Case.public_id == public_id)
+    
+    # Date range filters
+    if date_from:
+        try:
+            date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+            query = query.where(models.Case.created_at >= date_from_dt)
+        except ValueError:
+            pass  # Invalid date format, skip filter
+    
+    if date_to:
+        try:
+            date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            query = query.where(models.Case.created_at <= date_to_dt)
+        except ValueError:
+            pass  # Invalid date format, skip filter
+    
+    # Overdue filter (placeholder - will be implemented when SLA fields are added)
+    # For now, we'll mark cases as overdue if they're in NEW or IN_PROGRESS status
+    # and older than 7 days
+    if overdue is not None:
+        from datetime import timedelta
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        
+        if overdue:
+            # Cases that are overdue: old and not resolved
+            query = query.where(
+                models.Case.created_at < seven_days_ago,
+                models.Case.status.in_([models.CaseStatus.NEW, models.CaseStatus.IN_PROGRESS])
+            )
+        else:
+            # Cases that are not overdue
+            from sqlalchemy import or_
+            query = query.where(
+                or_(
+                    models.Case.created_at >= seven_days_ago,
+                    models.Case.status.in_([models.CaseStatus.DONE, models.CaseStatus.REJECTED])
+                )
+            )
     
     # Get total count
     count_result = db.execute(
@@ -790,8 +842,29 @@ async def get_all_cases(
     )
     total = len(count_result.all())
     
-    # Apply pagination and ordering (newest first)
-    query = query.order_by(models.Case.created_at.desc()).offset(skip).limit(limit)
+    # Apply sorting
+    if order_by:
+        if order_by.startswith('-'):
+            # Descending order
+            field_name = order_by[1:]
+            if hasattr(models.Case, field_name):
+                query = query.order_by(getattr(models.Case, field_name).desc())
+            else:
+                # Default to created_at descending
+                query = query.order_by(models.Case.created_at.desc())
+        else:
+            # Ascending order
+            if hasattr(models.Case, order_by):
+                query = query.order_by(getattr(models.Case, order_by).asc())
+            else:
+                # Default to created_at descending
+                query = query.order_by(models.Case.created_at.desc())
+    else:
+        # Default sorting
+        query = query.order_by(models.Case.created_at.desc())
+    
+    # Apply pagination
+    query = query.offset(skip).limit(limit)
     
     result = db.execute(query)
     cases = result.scalars().all()
@@ -876,6 +949,54 @@ async def update_case(
     db.refresh(db_case)
     
     return db_case
+
+
+async def delete_case(db: Session, case_id: UUID) -> bool:
+    """
+    Delete case by ID (hard delete).
+    
+    Note: This will cascade delete all attachments.
+    
+    Args:
+        db: Database session
+        case_id: Case UUID
+        
+    Returns:
+        True if case was deleted, False if not found
+    """
+    db_case = await get_case(db, case_id)
+    if not db_case:
+        return False
+    
+    db.delete(db_case)
+    db.commit()
+    
+    return True
+
+
+async def get_executors_for_category(
+    db: Session,
+    category_id: UUID
+) -> list[models.User]:
+    """
+    Get all active executors (users with EXECUTOR or ADMIN role).
+    
+    Note: In the future, this can be enhanced to filter by category assignment.
+    For now, returns all active executors.
+    
+    Args:
+        db: Database session
+        category_id: Category UUID (currently not used, for future enhancement)
+        
+    Returns:
+        List of executor users
+    """
+    query = select(models.User).where(
+        models.User.role.in_([models.UserRole.EXECUTOR, models.UserRole.ADMIN]),
+        models.User.is_active == True
+    )
+    
+    return list(db.execute(query).scalars().all())
 
 
 # ==================== Attachment CRUD Operations ====================
