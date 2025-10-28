@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app import crud, schemas, models
 from app.database import get_db, check_db_connection
-from app.auth import verify_password
+from app.dependencies import get_current_user, require_admin, get_current_active_user
+from app.routers import auth
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
@@ -43,6 +44,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(auth.router)
 
 @app.get("/")
 async def root():
@@ -86,11 +90,16 @@ async def config_check():
 # ==================== User Management Endpoints ====================
 
 @app.post("/api/users", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
-async def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+async def create_user(
+    user: schemas.UserCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
     """
     Create a new user.
     
     Requires: username, email, full_name, password, role
+    Requires: Admin privileges
     """
     try:
         db_user = await crud.create_user(db, user)
@@ -100,28 +109,35 @@ async def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/api/users/me", response_model=schemas.UserResponse)
-async def get_current_user(
-    current_user_id: UUID,  # TODO: Get from JWT token
-    db: Session = Depends(get_db)
+async def get_current_user_endpoint(
+    current_user: models.User = Depends(get_current_active_user),
 ):
     """
     Get current authenticated user.
     
-    TODO: Implement JWT authentication
+    Requires valid JWT access token in Authorization header.
     """
-    db_user = await crud.get_user(db, current_user_id)
-    if not db_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return db_user
+    return current_user
 
 
 @app.get("/api/users/{user_id}", response_model=schemas.UserResponse)
-async def get_user(user_id: UUID, db: Session = Depends(get_db)):
+async def get_user(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
+):
     """
     Get user by ID.
     
-    TODO: Add permission check (admin or self)
+    Admin can view any user, others can only view themselves.
     """
+    # Check permissions: admin or self
+    if current_user.role != models.UserRole.ADMIN and current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this user"
+        )
+    
     db_user = await crud.get_user(db, user_id)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -134,12 +150,13 @@ async def list_users(
     limit: int = 100,
     role: Optional[models.UserRole] = None,
     is_active: Optional[bool] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
 ):
     """
     List users with filtering and pagination.
     
-    TODO: Add permission check (admin only)
+    Requires: Admin privileges
     
     Query params:
     - skip: Number of records to skip (default: 0)
@@ -150,14 +167,29 @@ async def list_users(
     if limit > 100:
         limit = 100
     
-    users = await crud.get_users(db, skip=skip, limit=limit, role=role, is_active=is_active)
-    total = len(users)  # TODO: Add proper count query
+    db_users = await crud.get_users(db, skip=skip, limit=limit, role=role, is_active=is_active)
+    total = len(db_users)  # TODO: Add proper count query
+    
+    # Convert User models to UserResponse schemas
+    users = [
+        schemas.UserResponse(
+            id=str(user.id),
+            username=user.username,
+            email=user.email,
+            full_name=user.full_name,
+            role=user.role,
+            is_active=user.is_active,
+            created_at=user.created_at,
+            updated_at=user.updated_at
+        )
+        for user in db_users
+    ]
     
     return {
         "users": users,
         "total": total,
-        "skip": skip,
-        "limit": limit
+        "page": skip // limit if limit > 0 else 0,
+        "page_size": limit
     }
 
 
@@ -165,13 +197,36 @@ async def list_users(
 async def update_user(
     user_id: UUID,
     user_update: schemas.UserUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
 ):
     """
     Update user information.
     
-    TODO: Add permission check (admin or self)
+    Admin can update any user, others can only update themselves (limited fields).
     """
+    # Check permissions: admin or self
+    if current_user.role != models.UserRole.ADMIN and current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this user"
+        )
+    
+    # Non-admin users can only update limited fields
+    if current_user.role != models.UserRole.ADMIN:
+        # Prevent role change by non-admin
+        if user_update.role is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to change user role"
+            )
+        # Prevent is_active change by non-admin
+        if user_update.is_active is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to change user active status"
+            )
+    
     try:
         db_user = await crud.update_user(db, user_id, user_update)
         if not db_user:
@@ -185,13 +240,21 @@ async def update_user(
 async def update_user_password(
     user_id: UUID,
     password_update: schemas.UserPasswordUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
 ):
     """
     Update user password.
     
-    TODO: Add permission check (admin or self with old password verification)
+    Admin can update any user's password, others can only update their own.
     """
+    # Check permissions: admin or self
+    if current_user.role != models.UserRole.ADMIN and current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this user's password"
+        )
+    
     db_user = await crud.update_user_password(db, user_id, password_update)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -199,11 +262,15 @@ async def update_user_password(
 
 
 @app.delete("/api/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user_id: UUID, db: Session = Depends(get_db)):
+async def delete_user(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
     """
     Delete user (hard delete).
     
-    TODO: Add permission check (admin only)
+    Requires: Admin privileges
     """
     deleted = await crud.delete_user(db, user_id)
     if not deleted:
@@ -212,11 +279,15 @@ async def delete_user(user_id: UUID, db: Session = Depends(get_db)):
 
 
 @app.post("/api/users/{user_id}/deactivate", response_model=schemas.UserResponse)
-async def deactivate_user(user_id: UUID, db: Session = Depends(get_db)):
+async def deactivate_user(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
     """
     Deactivate user (soft delete).
     
-    TODO: Add permission check (admin only)
+    Requires: Admin privileges
     """
     db_user = await crud.deactivate_user(db, user_id)
     if not db_user:
@@ -225,11 +296,15 @@ async def deactivate_user(user_id: UUID, db: Session = Depends(get_db)):
 
 
 @app.post("/api/users/{user_id}/activate", response_model=schemas.UserResponse)
-async def activate_user(user_id: UUID, db: Session = Depends(get_db)):
+async def activate_user(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
     """
     Activate user.
     
-    TODO: Add permission check (admin only)
+    Requires: Admin privileges
     """
     db_user = await crud.activate_user(db, user_id)
     if not db_user:

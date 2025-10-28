@@ -24,6 +24,25 @@
 - [x] Configuration documented
 - [x] Security best practices applied
 
+### BE-001: Database Models & Migrations
+- [x] User model with roles (OPERATOR, EXECUTOR, ADMIN)
+- [x] Alembic migrations setup
+- [x] CRUD operations for users
+- [x] Password hashing with bcrypt
+
+### BE-002: JWT Authentication
+- [x] JWT access tokens (30 min expiration)
+- [x] JWT refresh tokens (7 days expiration)
+- [x] Login endpoint (POST /auth/login)
+- [x] Refresh endpoint (POST /auth/refresh)
+- [x] Logout endpoint (POST /auth/logout)
+- [x] Current user endpoint (GET /auth/me)
+- [x] Role-based access control dependencies
+- [x] Protected endpoints with Bearer authentication
+- [x] CORS configuration from environment
+- [x] Comprehensive test suite (16 tests)
+- [x] Documentation created
+
 ---
 
 ## 🚀 Quick Start
@@ -38,6 +57,19 @@ docker compose --env-file .env up -d --build
 - API Docs: http://localhost:8000/docs
 - Frontend: http://localhost:3000
 - Nginx: http://localhost:8080
+
+**API Endpoints:**
+- `POST /auth/login` - User login
+- `POST /auth/refresh` - Refresh access token
+- `POST /auth/logout` - User logout
+- `GET /auth/me` - Get current user
+- `GET /api/users` - List users (admin)
+- `POST /api/users` - Create user (admin)
+- `GET /api/users/{id}` - Get user (admin or self)
+- `PUT /api/users/{id}` - Update user (admin or self)
+- `DELETE /api/users/{id}` - Delete user (admin)
+- `POST /api/users/{id}/activate` - Activate user (admin)
+- `POST /api/users/{id}/deactivate` - Deactivate user (admin)
 
 **Verify:**
 ```powershell
@@ -100,6 +132,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-simple.ps1
 ### Application
 - `ohmatdyt-crm/api/app/main.py` - API entry point
 - `ohmatdyt-crm/api/app/celery_app.py` - Celery config
+- `ohmatdyt-crm/api/app/auth.py` - JWT & password utilities
+- `ohmatdyt-crm/api/app/dependencies.py` - Auth dependencies
+- `ohmatdyt-crm/api/app/routers/auth.py` - Auth endpoints
+- `ohmatdyt-crm/api/docs/JWT_AUTHENTICATION.md` - Auth documentation
 - `ohmatdyt-crm/frontend/src/pages/index.tsx` - Frontend home
 
 ### Scripts
@@ -143,13 +179,22 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-simple.ps1
 - Nginx reverse proxy: WORKING
 - Static file serving: READY
 
+✅ **Authentication & Security**
+- JWT access tokens: WORKING (30 min expiration)
+- JWT refresh tokens: WORKING (7 days expiration)
+- Bearer authentication: WORKING
+- Role-based access control: WORKING
+- Password hashing (bcrypt): WORKING
+- CORS configuration: WORKING
+- Protected endpoints: WORKING
+
 ---
 
 ## 📋 Next Development Tasks
 
 ### Backend (Фаза 1 - MVP)
 - [x] BE-001: Database models & Alembic migrations ✅ COMPLETED
-- [ ] BE-002: User authentication & JWT implementation (IN PROGRESS)
+- [x] BE-002: User authentication & JWT implementation ✅ COMPLETED
 - [ ] BE-003: Patient management endpoints
 - [ ] BE-004: Doctor management endpoints
 - [ ] BE-005: Appointment scheduling
@@ -162,7 +207,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-simple.ps1
 - [ ] FE-005: Dashboard & analytics
 
 ### Testing (Фаза 1 - MVP)
-- [ ] QA-001: Unit tests for API endpoints
+- [x] QA-001: Unit tests for authentication endpoints ✅ COMPLETED (16 tests)
 - [ ] QA-002: Integration tests for user flows
 
 ---
@@ -196,6 +241,18 @@ docker compose exec frontend npm list --depth=0
 ```powershell
 docker compose exec api alembic revision --autogenerate -m "description"
 docker compose exec api alembic upgrade head
+```
+
+### Running Tests
+```powershell
+# Run all tests
+docker compose exec api pytest -v
+
+# Run authentication tests
+docker compose exec api pytest tests/test_auth.py -v
+
+# Run with coverage
+docker compose exec api pytest --cov=app --cov-report=html
 ```
 
 ---
@@ -236,6 +293,43 @@ docker compose exec api alembic upgrade head
 
 ---
 
-**Status:** Infrastructure is production-ready. Application development can begin! 🚀
+**Status:** Infrastructure is production-ready. JWT Authentication implemented! 🚀
 
-**Next Step:** Start implementing BE-001 (Database models) or FE-001 (UI components)
+**Next Step:** Start implementing BE-003 (Patient/Request management) or FE-001 (UI components)
+
+---
+
+## 🎯 Latest Update (October 28, 2025)
+
+### BE-002: JWT Authentication - COMPLETED ✅
+
+**Implemented Features:**
+- ✅ JWT access & refresh tokens with secure signing
+- ✅ Login endpoint with username/password authentication
+- ✅ Token refresh endpoint for seamless re-authentication
+- ✅ Logout endpoint (client-side token removal)
+- ✅ Current user info endpoint (GET /auth/me)
+- ✅ Role-based access control (OPERATOR, EXECUTOR, ADMIN)
+- ✅ Protected endpoints with Bearer token authentication
+- ✅ Permission checks for all user management endpoints
+- ✅ CORS configuration from environment variables
+- ✅ Comprehensive documentation
+
+**Test Results:**
+- ✅ Login successful with valid credentials
+- ✅ Token validation working
+- ✅ Protected endpoints require authentication
+- ✅ Admin-only endpoints properly restricted
+- ✅ User list retrieval successful
+
+**API Endpoints Secured:**
+- All `/api/users/*` endpoints now require authentication
+- Admin role required for: list, create, delete, activate/deactivate
+- Users can view/update their own profiles
+
+**Security Features:**
+- Password hashing with bcrypt
+- JWT tokens with expiration (30 min access, 7 days refresh)
+- Role-based authorization
+- Input validation with Pydantic
+- CORS protection

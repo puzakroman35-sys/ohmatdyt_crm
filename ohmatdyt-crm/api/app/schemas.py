@@ -80,3 +80,32 @@ class UserListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+# ==================== Authentication Schemas ====================
+
+class LoginRequest(BaseModel):
+    """Schema for login request"""
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=1)
+
+
+class TokenResponse(BaseModel):
+    """Schema for token response"""
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int  # seconds until access token expires
+    user: UserResponse
+
+
+class RefreshTokenRequest(BaseModel):
+    """Schema for refresh token request"""
+    refresh_token: str
+
+
+class AccessTokenResponse(BaseModel):
+    """Schema for access token response"""
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int  # seconds until access token expires
