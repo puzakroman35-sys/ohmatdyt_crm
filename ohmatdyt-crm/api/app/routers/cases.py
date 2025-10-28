@@ -69,18 +69,11 @@ async def create_case_with_attachments(
     - Maximum size per file: 10MB
     - Files are stored in: MEDIA_ROOT/cases/{public_id}/
     
-    Only OPERATOR role can create cases.
+    Any authenticated user can create cases.
     After creation, triggers email notification to executors of the category.
     
     Returns created case with status=NEW and unique 6-digit public_id.
     """
-    # Check RBAC: Only OPERATOR can create cases
-    if current_user.role != models.UserRole.OPERATOR:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only operators can create cases"
-        )
-    
     # Validate file uploads (if any)
     validated_files = []
     if files:

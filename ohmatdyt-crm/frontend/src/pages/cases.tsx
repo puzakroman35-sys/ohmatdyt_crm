@@ -248,15 +248,13 @@ const CasesPage: React.FC = () => {
             <Title level={2} style={{ margin: 0 }}>
               Звернення
             </Title>
-            {user?.role === 'OPERATOR' || user?.role === 'ADMIN' ? (
-              <Button
-                type="primary"
-                size="large"
-                onClick={() => router.push('/cases/create')}
-              >
-                + Створити звернення
-              </Button>
-            ) : null}
+            <Button
+              type="primary"
+              size="large"
+              onClick={() => router.push('/cases/create')}
+            >
+              + Створити звернення
+            </Button>
           </div>
 
         {/* Фільтри */}

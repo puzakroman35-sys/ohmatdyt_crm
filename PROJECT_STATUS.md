@@ -151,13 +151,13 @@ ohmatdyt-crm/
 
 2. **Create Case Page** (`frontend/src/pages/cases/create.tsx`)
    - Обгортка для форми з MainLayout
-   - RoleGuard для обмеження доступу (тільки OPERATOR та ADMIN)
+   - AuthGuard для авторизованих користувачів (всі ролі)
    - Редірект після успішного створення
    - Обробка cancel action
 
 3. **Cases List Enhancement** (`frontend/src/pages/cases.tsx`)
    - Додана кнопка "Створити звернення"
-   - Відображається тільки для OPERATOR та ADMIN
+   - Відображається для всіх авторизованих користувачів
    - Навігація на /cases/create
 
 ### Form Fields
@@ -219,7 +219,7 @@ ohmatdyt-crm/
 - Повторна перевірка всіх полів
 - Перевірка існування category_id та channel_id
 - Валідація файлів на сервері
-- RBAC: тільки OPERATOR може створювати звернення
+- Доступно для всіх авторизованих користувачів
 
 ### Files Created/Modified
 
@@ -238,7 +238,7 @@ ohmatdyt-crm/
 - ✅ Форма очищується після успішного створення
 - ✅ Тести валідації полів і файлів
 - ✅ Відображення повідомлень про помилки
-- ✅ RoleGuard обмежує доступ (тільки OPERATOR/ADMIN)
+- ✅ AuthGuard забезпечує доступ тільки авторизованим користувачам
 
 ### Test Coverage (`test_fe003.py`)
 
@@ -275,7 +275,7 @@ ohmatdyt-crm/
 - Disabled state для всіх полів під час завантаження
 
 **Navigation:**
-- Кнопка "Створити звернення" на Cases List
+- Кнопка "Створити звернення" на Cases List (всі авторизовані)
 - Кнопка "Скасувати" для повернення
 - Auto-redirect після успіху
 - Breadcrumbs через MainLayout
@@ -336,9 +336,9 @@ ohmatdyt-crm/
 
 - Форма використовує Ant Design Form для валідації
 - Axios interceptor автоматично додає JWT токен
-- RoleGuard компонент обмежує доступ на рівні сторінки
-- Створення звернення доступне тільки для OPERATOR та ADMIN ролей
-- API endpoint перевіряє роль на сервері (додатковий захист)
+- AuthGuard компонент забезпечує доступ тільки авторизованим користувачам
+- Всі ролі (OPERATOR, EXECUTOR, ADMIN) можуть створювати звернення
+- API endpoint доступний для всіх авторизованих користувачів
 - Файли відправляються як FormData з Content-Type: multipart/form-data
 - Успішне створення тригерує email нотифікацію (Celery task)
 

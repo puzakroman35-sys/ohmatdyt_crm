@@ -93,8 +93,12 @@ const CreateCaseForm: React.FC<CreateCaseFormProps> = ({ onSuccess, onCancel }) 
           api.get('/api/channels'),
         ]);
 
-        setCategories(categoriesRes.data.filter((c: Category) => c.is_active));
-        setChannels(channelsRes.data.filter((c: Channel) => c.is_active));
+        // API повертає { categories: [...] } та { channels: [...] }
+        const categoriesList = categoriesRes.data.categories || categoriesRes.data || [];
+        const channelsList = channelsRes.data.channels || channelsRes.data || [];
+        
+        setCategories(categoriesList.filter((c: Category) => c.is_active));
+        setChannels(channelsList.filter((c: Channel) => c.is_active));
       } catch (error: any) {
         message.error('Помилка завантаження довідників: ' + (error.message || 'Невідома помилка'));
       } finally {
