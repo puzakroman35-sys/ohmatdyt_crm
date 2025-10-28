@@ -196,7 +196,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-simple.ps1
 - [x] BE-001: Database models & Alembic migrations ✅ COMPLETED
 - [x] BE-002: User authentication & JWT implementation ✅ COMPLETED
 - [x] BE-003: Categories and Channels (CRUD, activation/deactivation) ✅ COMPLETED
-- [ ] BE-004: Doctor management endpoints
+- [x] BE-004: Case model with 6-digit public_id generator ✅ COMPLETED
 - [ ] BE-005: Appointment scheduling
 
 ### Frontend (Фаза 1 - MVP)
@@ -379,3 +379,83 @@ docker compose exec api pytest --cov=app --cov-report=html
 - Created `channels` table with UUID primary key
 - Added unique constraints on name fields
 - Added indexes for performance
+
+---
+
+### BE-004: Case Model with public_id Generator - COMPLETED ✅
+
+**Implemented Features:**
+- ✅ CaseStatus enum (NEW, IN_PROGRESS, NEEDS_INFO, REJECTED, DONE)
+- ✅ Case model with all required fields
+- ✅ Unique 6-digit public_id generator (100000-999999)
+- ✅ Foreign key relationships (category, channel, author, responsible)
+- ✅ Database migration with proper indexes
+- ✅ CRUD operations for cases
+- ✅ Validation for category/channel active status
+- ✅ Validation for responsible user role (EXECUTOR or ADMIN only)
+- ✅ Comprehensive test suite (3 tests, all passed)
+
+**Case Model Fields:**
+- `id` - UUID primary key
+- `public_id` - Unique 6-digit integer (100000-999999)
+- `category_id` - FK to categories (RESTRICT on delete)
+- `channel_id` - FK to channels (RESTRICT on delete)
+- `author_id` - FK to users (OPERATOR who created the case, RESTRICT on delete)
+- `responsible_id` - FK to users (EXECUTOR assigned to case, nullable, SET NULL on delete)
+- `subcategory` - Optional string (200 chars)
+- `applicant_name` - Required string (200 chars)
+- `applicant_phone` - Optional phone number (50 chars)
+- `applicant_email` - Optional email (100 chars)
+- `summary` - Required text field
+- `status` - CaseStatus enum (default: NEW)
+- `created_at` - Timestamp
+- `updated_at` - Timestamp
+
+**Database Indexes:**
+- Primary key: `id`
+- Unique constraint: `public_id`
+- Single indexes: `category_id`, `channel_id`, `author_id`, `responsible_id`, `status`, `created_at`
+- Composite indexes: `(status, created_at)`, `(category_id, status)` - for query optimization
+
+**CRUD Operations:**
+- `create_case(db, case, author_id)` - Create case with unique public_id
+- `get_case(db, case_id)` - Get case by UUID
+- `get_case_by_public_id(db, public_id)` - Get case by 6-digit ID
+- `get_all_cases(db, filters...)` - List cases with filtering and pagination
+- `update_case(db, case_id, case_update)` - Update case fields
+
+**Validation Logic:**
+- Category must exist and be active
+- Channel must exist and be active
+- Responsible user must be EXECUTOR or ADMIN role
+- Responsible user must be active
+- Phone number must have at least 9 digits
+- Email must be valid format (via EmailStr)
+
+**Test Results:**
+✅ **Test 1: public_id Generation**
+- Generated 10 unique 6-digit IDs successfully
+- All IDs within range 100000-999999
+- No collisions detected
+
+✅ **Test 2: Case Creation**
+- Case created successfully with all fields
+- Retrieved by both UUID and public_id
+- Foreign key relationships working
+- Test data cleaned up properly
+
+✅ **Test 3: Uniqueness Constraint**
+- Database correctly rejects duplicate public_id
+- Unique constraint enforced at DB level
+- Proper error handling confirmed
+
+**Migration Applied:**
+- Migration ID: `d332e58ad7a9`
+- Creates `cases` table with all fields
+- Creates `casestatus` enum type
+- Adds all required indexes
+- Sets up foreign key constraints
+
+**Dependencies:**
+- BE-001 (User model) ✅
+- BE-003 (Categories and Channels) ✅

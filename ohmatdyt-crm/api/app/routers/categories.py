@@ -10,7 +10,7 @@ from app.database import get_db
 from app.dependencies import require_admin
 from app.models import User
 
-router = APIRouter(prefix="/categories", tags=["Categories"])
+router = APIRouter(prefix="/api/categories", tags=["Categories"])
 
 
 @router.get("", response_model=schemas.CategoryListResponse)

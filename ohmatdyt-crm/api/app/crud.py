@@ -633,3 +633,246 @@ async def activate_channel(db: Session, channel_id: UUID) -> Optional[models.Cha
     db.refresh(db_channel)
     
     return db_channel
+
+
+# ==================== Case CRUD Operations ====================
+
+async def create_case(
+    db: Session, 
+    case: schemas.CaseCreate, 
+    author_id: UUID
+) -> models.Case:
+    """
+    Create a new case with a unique 6-digit public_id.
+    
+    Args:
+        db: Database session
+        case: Case creation schema
+        author_id: UUID of the user creating the case (OPERATOR)
+        
+    Returns:
+        Created case model
+        
+    Raises:
+        ValueError: If category, channel, or responsible user doesn't exist
+    """
+    from app.utils import generate_unique_public_id
+    from uuid import UUID as parse_uuid
+    
+    # Validate category exists and is active
+    category = await get_category(db, parse_uuid(case.category_id))
+    if not category:
+        raise ValueError(f"Category with id '{case.category_id}' not found")
+    if not category.is_active:
+        raise ValueError(f"Category '{category.name}' is not active")
+    
+    # Validate channel exists and is active
+    channel = await get_channel(db, parse_uuid(case.channel_id))
+    if not channel:
+        raise ValueError(f"Channel with id '{case.channel_id}' not found")
+    if not channel.is_active:
+        raise ValueError(f"Channel '{channel.name}' is not active")
+    
+    # Validate responsible user if provided
+    responsible_id_uuid = None
+    if case.responsible_id:
+        responsible = await get_user(db, parse_uuid(case.responsible_id))
+        if not responsible:
+            raise ValueError(f"Responsible user with id '{case.responsible_id}' not found")
+        if responsible.role not in [models.UserRole.EXECUTOR, models.UserRole.ADMIN]:
+            raise ValueError(f"User '{responsible.username}' cannot be assigned as responsible (must be EXECUTOR or ADMIN)")
+        if not responsible.is_active:
+            raise ValueError(f"User '{responsible.username}' is not active")
+        responsible_id_uuid = parse_uuid(case.responsible_id)
+    
+    # Generate unique public_id
+    public_id = await generate_unique_public_id(db)
+    
+    # Create case
+    db_case = models.Case(
+        public_id=public_id,
+        category_id=parse_uuid(case.category_id),
+        channel_id=parse_uuid(case.channel_id),
+        subcategory=case.subcategory,
+        applicant_name=case.applicant_name,
+        applicant_phone=case.applicant_phone,
+        applicant_email=case.applicant_email,
+        summary=case.summary,
+        status=models.CaseStatus.NEW,
+        author_id=author_id,
+        responsible_id=responsible_id_uuid
+    )
+    
+    db.add(db_case)
+    db.commit()
+    db.refresh(db_case)
+    
+    return db_case
+
+
+async def get_case(db: Session, case_id: UUID) -> Optional[models.Case]:
+    """
+    Get case by UUID.
+    
+    Args:
+        db: Database session
+        case_id: Case UUID
+        
+    Returns:
+        Case model or None if not found
+    """
+    result = db.execute(
+        select(models.Case).where(models.Case.id == case_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_case_by_public_id(db: Session, public_id: int) -> Optional[models.Case]:
+    """
+    Get case by public_id (6-digit number).
+    
+    Args:
+        db: Database session
+        public_id: 6-digit case identifier
+        
+    Returns:
+        Case model or None if not found
+    """
+    result = db.execute(
+        select(models.Case).where(models.Case.public_id == public_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_all_cases(
+    db: Session,
+    status: Optional[models.CaseStatus] = None,
+    category_id: Optional[UUID] = None,
+    channel_id: Optional[UUID] = None,
+    author_id: Optional[UUID] = None,
+    responsible_id: Optional[UUID] = None,
+    skip: int = 0,
+    limit: int = 50
+) -> tuple[list[models.Case], int]:
+    """
+    Get all cases with optional filtering.
+    
+    Args:
+        db: Database session
+        status: Filter by case status
+        category_id: Filter by category
+        channel_id: Filter by channel
+        author_id: Filter by author
+        responsible_id: Filter by responsible user
+        skip: Number of records to skip (pagination)
+        limit: Maximum number of records to return
+        
+    Returns:
+        Tuple of (list of cases, total count)
+    """
+    query = select(models.Case)
+    
+    # Apply filters
+    if status:
+        query = query.where(models.Case.status == status)
+    if category_id:
+        query = query.where(models.Case.category_id == category_id)
+    if channel_id:
+        query = query.where(models.Case.channel_id == channel_id)
+    if author_id:
+        query = query.where(models.Case.author_id == author_id)
+    if responsible_id:
+        query = query.where(models.Case.responsible_id == responsible_id)
+    
+    # Get total count
+    count_result = db.execute(
+        select(models.Case.id).select_from(query.subquery())
+    )
+    total = len(count_result.all())
+    
+    # Apply pagination and ordering (newest first)
+    query = query.order_by(models.Case.created_at.desc()).offset(skip).limit(limit)
+    
+    result = db.execute(query)
+    cases = result.scalars().all()
+    
+    return list(cases), total
+
+
+async def update_case(
+    db: Session,
+    case_id: UUID,
+    case_update: schemas.CaseUpdate
+) -> Optional[models.Case]:
+    """
+    Update case information.
+    
+    Args:
+        db: Database session
+        case_id: Case UUID
+        case_update: Case update schema
+        
+    Returns:
+        Updated case model or None if not found
+        
+    Raises:
+        ValueError: If category, channel, or responsible user doesn't exist or is invalid
+    """
+    from uuid import UUID as parse_uuid
+    
+    db_case = await get_case(db, case_id)
+    if not db_case:
+        return None
+    
+    # Update fields if provided
+    if case_update.category_id is not None:
+        category = await get_category(db, parse_uuid(case_update.category_id))
+        if not category:
+            raise ValueError(f"Category with id '{case_update.category_id}' not found")
+        if not category.is_active:
+            raise ValueError(f"Category '{category.name}' is not active")
+        db_case.category_id = parse_uuid(case_update.category_id)
+    
+    if case_update.channel_id is not None:
+        channel = await get_channel(db, parse_uuid(case_update.channel_id))
+        if not channel:
+            raise ValueError(f"Channel with id '{case_update.channel_id}' not found")
+        if not channel.is_active:
+            raise ValueError(f"Channel '{channel.name}' is not active")
+        db_case.channel_id = parse_uuid(case_update.channel_id)
+    
+    if case_update.subcategory is not None:
+        db_case.subcategory = case_update.subcategory
+    
+    if case_update.applicant_name is not None:
+        db_case.applicant_name = case_update.applicant_name
+    
+    if case_update.applicant_phone is not None:
+        db_case.applicant_phone = case_update.applicant_phone
+    
+    if case_update.applicant_email is not None:
+        db_case.applicant_email = case_update.applicant_email
+    
+    if case_update.summary is not None:
+        db_case.summary = case_update.summary
+    
+    if case_update.status is not None:
+        db_case.status = case_update.status
+    
+    if case_update.responsible_id is not None:
+        if case_update.responsible_id == "":  # Allow clearing responsible
+            db_case.responsible_id = None
+        else:
+            responsible = await get_user(db, parse_uuid(case_update.responsible_id))
+            if not responsible:
+                raise ValueError(f"Responsible user with id '{case_update.responsible_id}' not found")
+            if responsible.role not in [models.UserRole.EXECUTOR, models.UserRole.ADMIN]:
+                raise ValueError(f"User '{responsible.username}' cannot be assigned as responsible (must be EXECUTOR or ADMIN)")
+            if not responsible.is_active:
+                raise ValueError(f"User '{responsible.username}' is not active")
+            db_case.responsible_id = parse_uuid(case_update.responsible_id)
+    
+    db.commit()
+    db.refresh(db_case)
+    
+    return db_case

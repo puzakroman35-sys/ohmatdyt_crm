@@ -4,7 +4,7 @@ Pydantic schemas for request/response validation
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
 from datetime import datetime
-from app.models import UserRole
+from app.models import UserRole, CaseStatus
 
 
 class UserBase(BaseModel):
@@ -177,3 +177,86 @@ class ChannelListResponse(BaseModel):
     """Schema for channel list"""
     channels: list[ChannelResponse]
     total: int
+
+
+# ==================== Case Schemas ====================
+
+class CaseBase(BaseModel):
+    """Base case schema"""
+    category_id: str = Field(..., description="UUID of the category")
+    channel_id: str = Field(..., description="UUID of the channel")
+    subcategory: Optional[str] = Field(None, max_length=200, description="Optional subcategory")
+    applicant_name: str = Field(..., min_length=1, max_length=200, description="Name of the applicant")
+    applicant_phone: Optional[str] = Field(None, max_length=50, description="Phone number of the applicant")
+    applicant_email: Optional[EmailStr] = Field(None, description="Email of the applicant")
+    summary: str = Field(..., min_length=1, description="Case summary/description")
+
+
+class CaseCreate(CaseBase):
+    """Schema for creating a new case"""
+    responsible_id: Optional[str] = Field(None, description="UUID of the responsible executor (optional)")
+    
+    @field_validator('applicant_phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Validate phone number format (basic validation)"""
+        if v is not None and v.strip():
+            # Remove common formatting characters
+            cleaned = v.strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '').replace('+', '')
+            if not cleaned.isdigit() or len(cleaned) < 9:
+                raise ValueError("Phone number must contain at least 9 digits")
+            return v.strip()
+        return None
+
+
+class CaseUpdate(BaseModel):
+    """Schema for updating case information"""
+    category_id: Optional[str] = None
+    channel_id: Optional[str] = None
+    subcategory: Optional[str] = Field(None, max_length=200)
+    applicant_name: Optional[str] = Field(None, min_length=1, max_length=200)
+    applicant_phone: Optional[str] = Field(None, max_length=50)
+    applicant_email: Optional[EmailStr] = None
+    summary: Optional[str] = Field(None, min_length=1)
+    status: Optional[CaseStatus] = None
+    responsible_id: Optional[str] = None
+    
+    @field_validator('applicant_phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Validate phone number format (basic validation)"""
+        if v is not None and v.strip():
+            # Remove common formatting characters
+            cleaned = v.strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '').replace('+', '')
+            if not cleaned.isdigit() or len(cleaned) < 9:
+                raise ValueError("Phone number must contain at least 9 digits")
+            return v.strip()
+        return None
+
+
+class CaseResponse(CaseBase):
+    """Schema for case response"""
+    id: str
+    public_id: int
+    status: CaseStatus
+    author_id: str
+    responsible_id: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    
+    # Optional nested objects (can be populated with joins)
+    category: Optional[CategoryResponse] = None
+    channel: Optional[ChannelResponse] = None
+    author: Optional[UserResponse] = None
+    responsible: Optional[UserResponse] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CaseListResponse(BaseModel):
+    """Schema for case list"""
+    cases: list[CaseResponse]
+    total: int
+    page: Optional[int] = 1
+    page_size: Optional[int] = 50

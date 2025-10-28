@@ -10,7 +10,7 @@ from app.database import get_db
 from app.dependencies import require_admin
 from app.models import User
 
-router = APIRouter(prefix="/channels", tags=["Channels"])
+router = APIRouter(prefix="/api/channels", tags=["Channels"])
 
 
 @router.get("", response_model=schemas.ChannelListResponse)
