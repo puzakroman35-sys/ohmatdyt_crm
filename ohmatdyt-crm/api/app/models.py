@@ -169,6 +169,7 @@ class Case(Base):
     channel = relationship("Channel", foreign_keys=[channel_id])
     author = relationship("User", foreign_keys=[author_id])
     responsible = relationship("User", foreign_keys=[responsible_id])
+    attachments = relationship("Attachment", back_populates="case", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Case(public_id={self.public_id}, status={self.status.value}, category={self.category_id})>"
@@ -190,4 +191,55 @@ class Case(Base):
             "responsible_id": str(self.responsible_id) if self.responsible_id else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class Attachment(Base):
+    """
+    Attachment model for case files
+    
+    Stores file attachments associated with cases.
+    Supports validation of file types and size limits.
+    
+    Allowed file types:
+    - Documents: pdf, doc, docx, xls, xlsx
+    - Images: jpg, jpeg, png
+    
+    Maximum file size: 10MB
+    """
+    __tablename__ = "attachments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    
+    # Foreign key
+    case_id = Column(UUID(as_uuid=True), ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # File information
+    file_path = Column(String(500), nullable=False)  # Relative path from MEDIA_ROOT
+    original_name = Column(String(255), nullable=False)  # Original filename from upload
+    size_bytes = Column(Integer, nullable=False)  # File size in bytes
+    mime_type = Column(String(100), nullable=False)  # MIME type (e.g., application/pdf)
+    
+    # Upload metadata
+    uploaded_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    
+    # Relationships
+    case = relationship("Case", back_populates="attachments")
+    uploaded_by = relationship("User", foreign_keys=[uploaded_by_id])
+
+    def __repr__(self):
+        return f"<Attachment(case_id={self.case_id}, original_name={self.original_name}, size={self.size_bytes})>"
+
+    def to_dict(self):
+        """Convert attachment to dictionary"""
+        return {
+            "id": str(self.id),
+            "case_id": str(self.case_id),
+            "file_path": self.file_path,
+            "original_name": self.original_name,
+            "size_bytes": self.size_bytes,
+            "mime_type": self.mime_type,
+            "uploaded_by_id": str(self.uploaded_by_id),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }

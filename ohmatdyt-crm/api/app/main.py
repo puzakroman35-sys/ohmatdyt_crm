@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app import crud, schemas, models
 from app.database import get_db, check_db_connection
 from app.dependencies import get_current_user, require_admin, get_current_active_user
-from app.routers import auth, categories, channels
+from app.routers import auth, categories, channels, attachments
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
@@ -49,6 +49,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(categories.router)
 app.include_router(channels.router)
+app.include_router(attachments.router)
 
 @app.get("/")
 async def root():

@@ -876,3 +876,119 @@ async def update_case(
     db.refresh(db_case)
     
     return db_case
+
+
+# ==================== Attachment CRUD Operations ====================
+
+async def create_attachment(
+    db: Session,
+    case_id: UUID,
+    file_path: str,
+    original_name: str,
+    size_bytes: int,
+    mime_type: str,
+    uploaded_by_id: UUID
+) -> models.Attachment:
+    """
+    Create a new attachment record.
+    
+    Args:
+        db: Database session
+        case_id: UUID of the case
+        file_path: Relative path from MEDIA_ROOT
+        original_name: Original filename
+        size_bytes: File size in bytes
+        mime_type: MIME type
+        uploaded_by_id: UUID of user uploading the file
+        
+    Returns:
+        Created attachment model
+        
+    Raises:
+        ValueError: If case doesn't exist
+    """
+    # Verify case exists
+    case = await get_case(db, case_id)
+    if not case:
+        raise ValueError(f"Case with id '{case_id}' not found")
+    
+    db_attachment = models.Attachment(
+        case_id=case_id,
+        file_path=file_path,
+        original_name=original_name,
+        size_bytes=size_bytes,
+        mime_type=mime_type,
+        uploaded_by_id=uploaded_by_id
+    )
+    
+    db.add(db_attachment)
+    db.commit()
+    db.refresh(db_attachment)
+    
+    return db_attachment
+
+
+async def get_attachment(db: Session, attachment_id: UUID) -> Optional[models.Attachment]:
+    """
+    Get attachment by ID.
+    
+    Args:
+        db: Database session
+        attachment_id: Attachment UUID
+        
+    Returns:
+        Attachment model or None if not found
+    """
+    return db.execute(
+        select(models.Attachment).where(models.Attachment.id == attachment_id)
+    ).scalar_one_or_none()
+
+
+async def get_case_attachments(
+    db: Session,
+    case_id: UUID,
+    skip: int = 0,
+    limit: int = 100
+) -> list[models.Attachment]:
+    """
+    Get all attachments for a specific case.
+    
+    Args:
+        db: Database session
+        case_id: Case UUID
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        
+    Returns:
+        List of attachment models
+    """
+    query = select(models.Attachment).where(
+        models.Attachment.case_id == case_id
+    ).order_by(models.Attachment.created_at.desc()).offset(skip).limit(limit)
+    
+    return list(db.execute(query).scalars().all())
+
+
+async def delete_attachment(db: Session, attachment_id: UUID) -> bool:
+    """
+    Delete attachment record from database.
+    
+    Note: This does NOT delete the physical file. File deletion should be
+    handled separately by the calling code.
+    
+    Args:
+        db: Database session
+        attachment_id: Attachment UUID
+        
+    Returns:
+        True if attachment was deleted, False if not found
+    """
+    db_attachment = await get_attachment(db, attachment_id)
+    if not db_attachment:
+        return False
+    
+    db.delete(db_attachment)
+    db.commit()
+    
+    return True
+

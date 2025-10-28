@@ -260,3 +260,34 @@ class CaseListResponse(BaseModel):
     total: int
     page: Optional[int] = 1
     page_size: Optional[int] = 50
+
+
+# ==================== Attachment Schemas ====================
+
+class AttachmentBase(BaseModel):
+    """Base attachment schema"""
+    original_name: str = Field(..., description="Original filename")
+    size_bytes: int = Field(..., description="File size in bytes")
+    mime_type: str = Field(..., description="MIME type")
+
+
+class AttachmentResponse(AttachmentBase):
+    """Schema for attachment response"""
+    id: str
+    case_id: str
+    file_path: str
+    uploaded_by_id: str
+    created_at: datetime
+    
+    # Optional nested objects
+    uploaded_by: Optional[UserResponse] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AttachmentListResponse(BaseModel):
+    """Schema for attachment list"""
+    attachments: list[AttachmentResponse]
+    total: int
+
