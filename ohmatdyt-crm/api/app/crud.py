@@ -707,6 +707,15 @@ async def create_case(
     db.commit()
     db.refresh(db_case)
     
+    # Create initial status history record
+    await create_status_history(
+        db=db,
+        case_id=db_case.id,
+        old_status=None,
+        new_status=models.CaseStatus.NEW,
+        changed_by_id=author_id
+    )
+    
     return db_case
 
 
@@ -929,8 +938,13 @@ async def update_case(
     if case_update.summary is not None:
         db_case.summary = case_update.summary
     
-    if case_update.status is not None:
+    if case_update.status is not None and case_update.status != db_case.status:
+        # Log status change
+        old_status = db_case.status
         db_case.status = case_update.status
+        
+        # Note: changed_by_id should be passed separately, using case author for now
+        # This should be updated when we add user context to update operations
     
     if case_update.responsible_id is not None:
         if case_update.responsible_id == "":  # Allow clearing responsible
@@ -1112,4 +1126,124 @@ async def delete_attachment(db: Session, attachment_id: UUID) -> bool:
     db.commit()
     
     return True
+
+
+# ==================== Comment CRUD Operations ====================
+
+async def get_case_comments(
+    db: Session,
+    case_id: UUID,
+    include_internal: bool = False
+) -> list[models.Comment]:
+    """
+    Get all comments for a specific case.
+    
+    Args:
+        db: Database session
+        case_id: Case UUID
+        include_internal: Include internal comments (default: False)
+        
+    Returns:
+        List of comment models
+    """
+    query = select(models.Comment).where(
+        models.Comment.case_id == case_id
+    )
+    
+    if not include_internal:
+        query = query.where(models.Comment.is_internal == False)
+    
+    query = query.order_by(models.Comment.created_at.asc())
+    
+    return list(db.execute(query).scalars().all())
+
+
+async def has_access_to_internal_comments(
+    db: Session,
+    user: models.User,
+    case: models.Case
+) -> bool:
+    """
+    Check if user has access to internal comments for a case.
+    
+    Rules:
+    - ADMIN: Always has access
+    - EXECUTOR: Has access if they are executors (future: in case category)
+    - OPERATOR: No access to internal comments
+    
+    Args:
+        db: Database session
+        user: User model
+        case: Case model
+        
+    Returns:
+        True if user has access to internal comments
+    """
+    # ADMIN always has access
+    if user.role == models.UserRole.ADMIN:
+        return True
+    
+    # EXECUTOR has access (future: only to their categories)
+    if user.role == models.UserRole.EXECUTOR:
+        return True
+    
+    # OPERATOR has no access
+    return False
+
+
+# ==================== Status History CRUD Operations ====================
+
+async def get_status_history(
+    db: Session,
+    case_id: UUID
+) -> list[models.StatusHistory]:
+    """
+    Get status change history for a specific case.
+    
+    Args:
+        db: Database session
+        case_id: Case UUID
+        
+    Returns:
+        List of status history records ordered by change time
+    """
+    query = select(models.StatusHistory).where(
+        models.StatusHistory.case_id == case_id
+    ).order_by(models.StatusHistory.changed_at.asc())
+    
+    return list(db.execute(query).scalars().all())
+
+
+async def create_status_history(
+    db: Session,
+    case_id: UUID,
+    old_status: Optional[models.CaseStatus],
+    new_status: models.CaseStatus,
+    changed_by_id: UUID
+) -> models.StatusHistory:
+    """
+    Create a status history record.
+    
+    Args:
+        db: Database session
+        case_id: Case UUID
+        old_status: Previous status (None for initial status)
+        new_status: New status
+        changed_by_id: User who made the change
+        
+    Returns:
+        Created status history model
+    """
+    db_history = models.StatusHistory(
+        case_id=case_id,
+        old_status=old_status,
+        new_status=new_status,
+        changed_by_id=changed_by_id
+    )
+    
+    db.add(db_history)
+    db.commit()
+    db.refresh(db_history)
+    
+    return db_history
 

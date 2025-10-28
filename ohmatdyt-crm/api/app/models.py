@@ -170,6 +170,8 @@ class Case(Base):
     author = relationship("User", foreign_keys=[author_id])
     responsible = relationship("User", foreign_keys=[responsible_id])
     attachments = relationship("Attachment", back_populates="case", cascade="all, delete-orphan")
+    comments = relationship("Comment", back_populates="case", cascade="all, delete-orphan")
+    status_history = relationship("StatusHistory", back_populates="case", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Case(public_id={self.public_id}, status={self.status.value}, category={self.category_id})>"
@@ -242,4 +244,88 @@ class Attachment(Base):
             "mime_type": self.mime_type,
             "uploaded_by_id": str(self.uploaded_by_id),
             "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class Comment(Base):
+    """
+    Comment model for case comments
+    
+    Supports both public and internal comments:
+    - Public comments: Visible to operator, responsible executor, and admin
+    - Internal comments: Visible only to executors of the category and admin
+    
+    Only EXECUTOR and ADMIN can create internal comments.
+    """
+    __tablename__ = "comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    
+    # Foreign keys
+    case_id = Column(UUID(as_uuid=True), ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    author_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    
+    # Comment content
+    text = Column(Text, nullable=False)
+    is_internal = Column(Boolean, default=False, nullable=False, index=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    
+    # Relationships
+    case = relationship("Case", back_populates="comments")
+    author = relationship("User", foreign_keys=[author_id])
+
+    def __repr__(self):
+        return f"<Comment(case_id={self.case_id}, author_id={self.author_id}, internal={self.is_internal})>"
+
+    def to_dict(self):
+        """Convert comment to dictionary"""
+        return {
+            "id": str(self.id),
+            "case_id": str(self.case_id),
+            "author_id": str(self.author_id),
+            "text": self.text,
+            "is_internal": self.is_internal,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class StatusHistory(Base):
+    """
+    Status history model for tracking case status changes
+    
+    Logs all status transitions for audit and tracking purposes.
+    """
+    __tablename__ = "status_history"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    
+    # Foreign keys
+    case_id = Column(UUID(as_uuid=True), ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    changed_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    
+    # Status change details
+    old_status = Column(SQLEnum(CaseStatus), nullable=True)  # NULL for initial status
+    new_status = Column(SQLEnum(CaseStatus), nullable=False, index=True)
+    
+    # Timestamp
+    changed_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    
+    # Relationships
+    case = relationship("Case", back_populates="status_history")
+    changed_by = relationship("User", foreign_keys=[changed_by_id])
+
+    def __repr__(self):
+        return f"<StatusHistory(case_id={self.case_id}, {self.old_status} -> {self.new_status})>"
+
+    def to_dict(self):
+        """Convert status history to dictionary"""
+        return {
+            "id": str(self.id),
+            "case_id": str(self.case_id),
+            "changed_by_id": str(self.changed_by_id),
+            "old_status": self.old_status.value if self.old_status else None,
+            "new_status": self.new_status.value,
+            "changed_at": self.changed_at.isoformat() if self.changed_at else None,
         }

@@ -291,3 +291,80 @@ class AttachmentListResponse(BaseModel):
     attachments: list[AttachmentResponse]
     total: int
 
+
+# ==================== Comment Schemas ====================
+
+class CommentResponse(BaseModel):
+    """Schema for comment response"""
+    id: str
+    case_id: str
+    author_id: str
+    text: str
+    is_internal: bool
+    created_at: datetime
+    
+    # Optional nested objects
+    author: Optional[UserResponse] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CommentListResponse(BaseModel):
+    """Schema for comment list"""
+    comments: list[CommentResponse]
+    total: int
+
+
+# ==================== Status History Schemas ====================
+
+class StatusHistoryResponse(BaseModel):
+    """Schema for status history response"""
+    id: str
+    case_id: str
+    changed_by_id: str
+    old_status: Optional[CaseStatus]
+    new_status: CaseStatus
+    changed_at: datetime
+    
+    # Optional nested objects
+    changed_by: Optional[UserResponse] = None
+
+    class Config:
+        from_attributes = True
+
+
+class StatusHistoryListResponse(BaseModel):
+    """Schema for status history list"""
+    history: list[StatusHistoryResponse]
+    total: int
+
+
+# ==================== Case Detail Schema ====================
+
+class CaseDetailResponse(CaseResponse):
+    """
+    Schema for detailed case response with nested data.
+    
+    Includes:
+    - All case fields from CaseResponse
+    - Category and channel details
+    - Author and responsible user details
+    - Status change history
+    - Comments (filtered by visibility rules)
+    - Attachments
+    """
+    # Override optional fields to always be populated
+    category: CategoryResponse
+    channel: ChannelResponse
+    author: UserResponse
+    responsible: Optional[UserResponse] = None
+    
+    # Additional nested data
+    status_history: list[StatusHistoryResponse] = []
+    comments: list[CommentResponse] = []
+    attachments: list[AttachmentResponse] = []
+
+    class Config:
+        from_attributes = True
+

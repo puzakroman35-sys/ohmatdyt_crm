@@ -417,14 +417,24 @@ async def list_assigned_cases(
     }
 
 
-@router.get("/{case_id}", response_model=schemas.CaseResponse)
+@router.get("/{case_id}", response_model=schemas.CaseDetailResponse)
 async def get_case(
     case_id: UUID,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
     """
-    Get case by ID.
+    Get detailed case information by ID.
+    
+    Returns complete case information including:
+    - Case details with category, channel, author, responsible
+    - Status change history
+    - Comments (filtered by visibility rules)
+    - Attachments
+    
+    Comment visibility rules:
+    - Public comments: Visible to case author (OPERATOR), responsible executor, and ADMIN
+    - Internal comments: Visible only to EXECUTOR and ADMIN
     
     RBAC:
     - OPERATOR: can view own cases
@@ -444,7 +454,139 @@ async def get_case(
             detail="Not authorized to view this case"
         )
     
-    return schemas.CaseResponse(
+    # Get category details
+    category = await crud.get_category(db, db_case.category_id)
+    category_response = schemas.CategoryResponse(
+        id=str(category.id),
+        name=category.name,
+        is_active=category.is_active,
+        created_at=category.created_at,
+        updated_at=category.updated_at
+    )
+    
+    # Get channel details
+    channel = await crud.get_channel(db, db_case.channel_id)
+    channel_response = schemas.ChannelResponse(
+        id=str(channel.id),
+        name=channel.name,
+        is_active=channel.is_active,
+        created_at=channel.created_at,
+        updated_at=channel.updated_at
+    )
+    
+    # Get author details
+    author = await crud.get_user(db, db_case.author_id)
+    author_response = schemas.UserResponse(
+        id=str(author.id),
+        username=author.username,
+        email=author.email,
+        full_name=author.full_name,
+        role=author.role,
+        is_active=author.is_active,
+        created_at=author.created_at,
+        updated_at=author.updated_at
+    )
+    
+    # Get responsible details (if assigned)
+    responsible_response = None
+    if db_case.responsible_id:
+        responsible = await crud.get_user(db, db_case.responsible_id)
+        if responsible:
+            responsible_response = schemas.UserResponse(
+                id=str(responsible.id),
+                username=responsible.username,
+                email=responsible.email,
+                full_name=responsible.full_name,
+                role=responsible.role,
+                is_active=responsible.is_active,
+                created_at=responsible.created_at,
+                updated_at=responsible.updated_at
+            )
+    
+    # Get status history
+    status_history = await crud.get_status_history(db, db_case.id)
+    status_history_responses = []
+    for history in status_history:
+        changed_by = await crud.get_user(db, history.changed_by_id)
+        changed_by_response = schemas.UserResponse(
+            id=str(changed_by.id),
+            username=changed_by.username,
+            email=changed_by.email,
+            full_name=changed_by.full_name,
+            role=changed_by.role,
+            is_active=changed_by.is_active,
+            created_at=changed_by.created_at,
+            updated_at=changed_by.updated_at
+        )
+        
+        status_history_responses.append(schemas.StatusHistoryResponse(
+            id=str(history.id),
+            case_id=str(history.case_id),
+            changed_by_id=str(history.changed_by_id),
+            old_status=history.old_status,
+            new_status=history.new_status,
+            changed_at=history.changed_at,
+            changed_by=changed_by_response
+        ))
+    
+    # Get comments (filtered by visibility)
+    has_internal_access = await crud.has_access_to_internal_comments(db, current_user, db_case)
+    comments = await crud.get_case_comments(db, db_case.id, include_internal=has_internal_access)
+    
+    comment_responses = []
+    for comment in comments:
+        comment_author = await crud.get_user(db, comment.author_id)
+        comment_author_response = schemas.UserResponse(
+            id=str(comment_author.id),
+            username=comment_author.username,
+            email=comment_author.email,
+            full_name=comment_author.full_name,
+            role=comment_author.role,
+            is_active=comment_author.is_active,
+            created_at=comment_author.created_at,
+            updated_at=comment_author.updated_at
+        )
+        
+        comment_responses.append(schemas.CommentResponse(
+            id=str(comment.id),
+            case_id=str(comment.case_id),
+            author_id=str(comment.author_id),
+            text=comment.text,
+            is_internal=comment.is_internal,
+            created_at=comment.created_at,
+            author=comment_author_response
+        ))
+    
+    # Get attachments
+    attachments = await crud.get_case_attachments(db, db_case.id)
+    attachment_responses = []
+    for attachment in attachments:
+        uploaded_by = await crud.get_user(db, attachment.uploaded_by_id)
+        uploaded_by_response = schemas.UserResponse(
+            id=str(uploaded_by.id),
+            username=uploaded_by.username,
+            email=uploaded_by.email,
+            full_name=uploaded_by.full_name,
+            role=uploaded_by.role,
+            is_active=uploaded_by.is_active,
+            created_at=uploaded_by.created_at,
+            updated_at=uploaded_by.updated_at
+        )
+        
+        attachment_responses.append(schemas.AttachmentResponse(
+            id=str(attachment.id),
+            case_id=str(attachment.case_id),
+            file_path=attachment.file_path,
+            original_name=attachment.original_name,
+            size_bytes=attachment.size_bytes,
+            mime_type=attachment.mime_type,
+            uploaded_by_id=str(attachment.uploaded_by_id),
+            created_at=attachment.created_at,
+            uploaded_by=uploaded_by_response
+        ))
+    
+    # Return detailed case response
+    return schemas.CaseDetailResponse(
         id=str(db_case.id),
         public_id=db_case.public_id,
         category_id=str(db_case.category_id),
@@ -458,7 +600,14 @@ async def get_case(
         author_id=str(db_case.author_id),
         responsible_id=str(db_case.responsible_id) if db_case.responsible_id else None,
         created_at=db_case.created_at,
-        updated_at=db_case.updated_at
+        updated_at=db_case.updated_at,
+        category=category_response,
+        channel=channel_response,
+        author=author_response,
+        responsible=responsible_response,
+        status_history=status_history_responses,
+        comments=comment_responses,
+        attachments=attachment_responses
     )
 
 
