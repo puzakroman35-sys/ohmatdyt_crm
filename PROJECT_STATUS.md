@@ -148,8 +148,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-simple.ps1
 ## 📋 Next Development Tasks
 
 ### Backend (Фаза 1 - MVP)
-- [ ] BE-001: Database models & Alembic migrations
-- [ ] BE-002: User authentication & JWT implementation
+- [x] BE-001: Database models & Alembic migrations ✅ COMPLETED
+- [ ] BE-002: User authentication & JWT implementation (IN PROGRESS)
 - [ ] BE-003: Patient management endpoints
 - [ ] BE-004: Doctor management endpoints
 - [ ] BE-005: Appointment scheduling
