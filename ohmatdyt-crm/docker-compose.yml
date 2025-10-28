@@ -1,0 +1,116 @@
+name: ${COMPOSE_PROJECT_NAME:-ohmatdyt_crm}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h 127.0.0.1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "no"]
+    volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./api
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - media:/var/app/media
+      - static:/var/app/static
+    ports:
+      - "${API_PORT}:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "[ -d /var/app/media ] && [ -d /var/app/static ]"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    build:
+      context: ./worker
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
+    volumes:
+      - media:/var/app/media
+      - static:/var/app/static
+    restart: unless-stopped
+
+  beat:
+    build:
+      context: ./beat
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
+    volumes:
+      - media:/var/app/media
+      - static:/var/app/static
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    env_file:
+      - .env
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "${FRONTEND_PORT}:3000"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.25-alpine
+    depends_on:
+      api:
+        condition: service_started
+      frontend:
+        condition: service_started
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - media:/var/app/media:ro
+      - static:/var/app/static:ro
+    ports:
+      - "${NGINX_PORT}:80"
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  media:
+  static:
