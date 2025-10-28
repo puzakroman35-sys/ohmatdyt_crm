@@ -9,7 +9,7 @@ from app import models, schemas
 from app.auth import hash_password
 
 
-async def create_user(db: Session, user: schemas.UserCreate) -> models.User:
+def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     """
     Create a new user.
     
@@ -54,7 +54,7 @@ async def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     return db_user
 
 
-async def get_user(db: Session, user_id: UUID) -> Optional[models.User]:
+def get_user(db: Session, user_id: UUID) -> Optional[models.User]:
     """
     Get user by ID.
     
@@ -70,7 +70,7 @@ async def get_user(db: Session, user_id: UUID) -> Optional[models.User]:
     ).scalar_one_or_none()
 
 
-async def get_user_by_username(db: Session, username: str) -> Optional[models.User]:
+def get_user_by_username(db: Session, username: str) -> Optional[models.User]:
     """
     Get user by username.
     
@@ -86,7 +86,7 @@ async def get_user_by_username(db: Session, username: str) -> Optional[models.Us
     ).scalar_one_or_none()
 
 
-async def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
+def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
     """
     Get user by email.
     
@@ -102,7 +102,7 @@ async def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
     ).scalar_one_or_none()
 
 
-async def get_users(
+def get_users(
     db: Session,
     skip: int = 0,
     limit: int = 100,
@@ -135,7 +135,7 @@ async def get_users(
     return list(db.execute(query).scalars().all())
 
 
-async def update_user(
+def update_user(
     db: Session,
     user_id: UUID,
     user_update: schemas.UserUpdate
@@ -154,7 +154,7 @@ async def update_user(
     Raises:
         ValueError: If username or email already exists for another user
     """
-    db_user = await get_user(db, user_id)
+    db_user = get_user(db, user_id)
     if not db_user:
         return None
     
@@ -162,13 +162,13 @@ async def update_user(
     
     # Check username uniqueness if being updated
     if 'username' in update_data and update_data['username'] != db_user.username:
-        existing = await get_user_by_username(db, update_data['username'])
+        existing = get_user_by_username(db, update_data['username'])
         if existing and existing.id != user_id:
             raise ValueError(f"Username '{update_data['username']}' already exists")
     
     # Check email uniqueness if being updated
     if 'email' in update_data and update_data['email'] != db_user.email:
-        existing = await get_user_by_email(db, update_data['email'])
+        existing = get_user_by_email(db, update_data['email'])
         if existing and existing.id != user_id:
             raise ValueError(f"Email '{update_data['email']}' already exists")
     
@@ -182,7 +182,7 @@ async def update_user(
     return db_user
 
 
-async def update_user_password(
+def update_user_password(
     db: Session,
     user_id: UUID,
     password_update: schemas.UserPasswordUpdate
@@ -198,7 +198,7 @@ async def update_user_password(
     Returns:
         Updated user model or None if not found
     """
-    db_user = await get_user(db, user_id)
+    db_user = get_user(db, user_id)
     if not db_user:
         return None
     
@@ -210,7 +210,7 @@ async def update_user_password(
     return db_user
 
 
-async def delete_user(db: Session, user_id: UUID) -> bool:
+def delete_user(db: Session, user_id: UUID) -> bool:
     """
     Delete user by ID.
     
@@ -221,7 +221,7 @@ async def delete_user(db: Session, user_id: UUID) -> bool:
     Returns:
         True if user was deleted, False if not found
     """
-    db_user = await get_user(db, user_id)
+    db_user = get_user(db, user_id)
     if not db_user:
         return False
     
@@ -231,7 +231,7 @@ async def delete_user(db: Session, user_id: UUID) -> bool:
     return True
 
 
-async def deactivate_user(db: Session, user_id: UUID) -> Optional[models.User]:
+def deactivate_user(db: Session, user_id: UUID) -> Optional[models.User]:
     """
     Deactivate user (soft delete).
     
@@ -242,7 +242,7 @@ async def deactivate_user(db: Session, user_id: UUID) -> Optional[models.User]:
     Returns:
         Updated user model or None if not found
     """
-    db_user = await get_user(db, user_id)
+    db_user = get_user(db, user_id)
     if not db_user:
         return None
     
@@ -254,7 +254,7 @@ async def deactivate_user(db: Session, user_id: UUID) -> Optional[models.User]:
     return db_user
 
 
-async def activate_user(db: Session, user_id: UUID) -> Optional[models.User]:
+def activate_user(db: Session, user_id: UUID) -> Optional[models.User]:
     """
     Activate user.
     
@@ -265,7 +265,7 @@ async def activate_user(db: Session, user_id: UUID) -> Optional[models.User]:
     Returns:
         Updated user model or None if not found
     """
-    db_user = await get_user(db, user_id)
+    db_user = get_user(db, user_id)
     if not db_user:
         return None
     
@@ -279,7 +279,7 @@ async def activate_user(db: Session, user_id: UUID) -> Optional[models.User]:
 
 # ==================== Category CRUD Operations ====================
 
-async def create_category(db: Session, category: schemas.CategoryCreate) -> models.Category:
+def create_category(db: Session, category: schemas.CategoryCreate) -> models.Category:
     """
     Create a new category.
     
@@ -309,7 +309,7 @@ async def create_category(db: Session, category: schemas.CategoryCreate) -> mode
     return db_category
 
 
-async def get_category(db: Session, category_id: UUID) -> Optional[models.Category]:
+def get_category(db: Session, category_id: UUID) -> Optional[models.Category]:
     """
     Get category by ID.
     
@@ -325,7 +325,7 @@ async def get_category(db: Session, category_id: UUID) -> Optional[models.Catego
     ).scalar_one_or_none()
 
 
-async def get_category_by_name(db: Session, name: str) -> Optional[models.Category]:
+def get_category_by_name(db: Session, name: str) -> Optional[models.Category]:
     """
     Get category by name.
     
@@ -341,7 +341,7 @@ async def get_category_by_name(db: Session, name: str) -> Optional[models.Catego
     ).scalar_one_or_none()
 
 
-async def get_categories(
+def get_categories(
     db: Session,
     skip: int = 0,
     limit: int = 100,
@@ -369,7 +369,7 @@ async def get_categories(
     return list(db.execute(query).scalars().all())
 
 
-async def update_category(
+def update_category(
     db: Session,
     category_id: UUID,
     category_update: schemas.CategoryUpdate
@@ -388,7 +388,7 @@ async def update_category(
     Raises:
         ValueError: If new name already exists for another category
     """
-    db_category = await get_category(db, category_id)
+    db_category = get_category(db, category_id)
     if not db_category:
         return None
     
@@ -396,7 +396,7 @@ async def update_category(
     
     # Check name uniqueness if being updated
     if 'name' in update_data and update_data['name'] != db_category.name:
-        existing = await get_category_by_name(db, update_data['name'])
+        existing = get_category_by_name(db, update_data['name'])
         if existing and existing.id != category_id:
             raise ValueError(f"Category '{update_data['name']}' already exists")
     
@@ -410,7 +410,7 @@ async def update_category(
     return db_category
 
 
-async def deactivate_category(db: Session, category_id: UUID) -> Optional[models.Category]:
+def deactivate_category(db: Session, category_id: UUID) -> Optional[models.Category]:
     """
     Deactivate category.
     
@@ -421,7 +421,7 @@ async def deactivate_category(db: Session, category_id: UUID) -> Optional[models
     Returns:
         Updated category model or None if not found
     """
-    db_category = await get_category(db, category_id)
+    db_category = get_category(db, category_id)
     if not db_category:
         return None
     
@@ -433,7 +433,7 @@ async def deactivate_category(db: Session, category_id: UUID) -> Optional[models
     return db_category
 
 
-async def activate_category(db: Session, category_id: UUID) -> Optional[models.Category]:
+def activate_category(db: Session, category_id: UUID) -> Optional[models.Category]:
     """
     Activate category.
     
@@ -444,7 +444,7 @@ async def activate_category(db: Session, category_id: UUID) -> Optional[models.C
     Returns:
         Updated category model or None if not found
     """
-    db_category = await get_category(db, category_id)
+    db_category = get_category(db, category_id)
     if not db_category:
         return None
     
@@ -458,7 +458,7 @@ async def activate_category(db: Session, category_id: UUID) -> Optional[models.C
 
 # ==================== Channel CRUD Operations ====================
 
-async def create_channel(db: Session, channel: schemas.ChannelCreate) -> models.Channel:
+def create_channel(db: Session, channel: schemas.ChannelCreate) -> models.Channel:
     """
     Create a new channel.
     
@@ -488,7 +488,7 @@ async def create_channel(db: Session, channel: schemas.ChannelCreate) -> models.
     return db_channel
 
 
-async def get_channel(db: Session, channel_id: UUID) -> Optional[models.Channel]:
+def get_channel(db: Session, channel_id: UUID) -> Optional[models.Channel]:
     """
     Get channel by ID.
     
@@ -504,7 +504,7 @@ async def get_channel(db: Session, channel_id: UUID) -> Optional[models.Channel]
     ).scalar_one_or_none()
 
 
-async def get_channel_by_name(db: Session, name: str) -> Optional[models.Channel]:
+def get_channel_by_name(db: Session, name: str) -> Optional[models.Channel]:
     """
     Get channel by name.
     
@@ -520,7 +520,7 @@ async def get_channel_by_name(db: Session, name: str) -> Optional[models.Channel
     ).scalar_one_or_none()
 
 
-async def get_channels(
+def get_channels(
     db: Session,
     skip: int = 0,
     limit: int = 100,
@@ -548,7 +548,7 @@ async def get_channels(
     return list(db.execute(query).scalars().all())
 
 
-async def update_channel(
+def update_channel(
     db: Session,
     channel_id: UUID,
     channel_update: schemas.ChannelUpdate
@@ -567,7 +567,7 @@ async def update_channel(
     Raises:
         ValueError: If new name already exists for another channel
     """
-    db_channel = await get_channel(db, channel_id)
+    db_channel = get_channel(db, channel_id)
     if not db_channel:
         return None
     
@@ -575,7 +575,7 @@ async def update_channel(
     
     # Check name uniqueness if being updated
     if 'name' in update_data and update_data['name'] != db_channel.name:
-        existing = await get_channel_by_name(db, update_data['name'])
+        existing = get_channel_by_name(db, update_data['name'])
         if existing and existing.id != channel_id:
             raise ValueError(f"Channel '{update_data['name']}' already exists")
     
@@ -589,7 +589,7 @@ async def update_channel(
     return db_channel
 
 
-async def deactivate_channel(db: Session, channel_id: UUID) -> Optional[models.Channel]:
+def deactivate_channel(db: Session, channel_id: UUID) -> Optional[models.Channel]:
     """
     Deactivate channel.
     
@@ -600,7 +600,7 @@ async def deactivate_channel(db: Session, channel_id: UUID) -> Optional[models.C
     Returns:
         Updated channel model or None if not found
     """
-    db_channel = await get_channel(db, channel_id)
+    db_channel = get_channel(db, channel_id)
     if not db_channel:
         return None
     
@@ -612,7 +612,7 @@ async def deactivate_channel(db: Session, channel_id: UUID) -> Optional[models.C
     return db_channel
 
 
-async def activate_channel(db: Session, channel_id: UUID) -> Optional[models.Channel]:
+def activate_channel(db: Session, channel_id: UUID) -> Optional[models.Channel]:
     """
     Activate channel.
     
@@ -623,7 +623,7 @@ async def activate_channel(db: Session, channel_id: UUID) -> Optional[models.Cha
     Returns:
         Updated channel model or None if not found
     """
-    db_channel = await get_channel(db, channel_id)
+    db_channel = get_channel(db, channel_id)
     if not db_channel:
         return None
     
@@ -637,7 +637,7 @@ async def activate_channel(db: Session, channel_id: UUID) -> Optional[models.Cha
 
 # ==================== Case CRUD Operations ====================
 
-async def create_case(
+def create_case(
     db: Session, 
     case: schemas.CaseCreate, 
     author_id: UUID
@@ -660,14 +660,14 @@ async def create_case(
     from uuid import UUID as parse_uuid
     
     # Validate category exists and is active
-    category = await get_category(db, parse_uuid(case.category_id))
+    category = get_category(db, parse_uuid(case.category_id))
     if not category:
         raise ValueError(f"Category with id '{case.category_id}' not found")
     if not category.is_active:
         raise ValueError(f"Category '{category.name}' is not active")
     
     # Validate channel exists and is active
-    channel = await get_channel(db, parse_uuid(case.channel_id))
+    channel = get_channel(db, parse_uuid(case.channel_id))
     if not channel:
         raise ValueError(f"Channel with id '{case.channel_id}' not found")
     if not channel.is_active:
@@ -676,7 +676,7 @@ async def create_case(
     # Validate responsible user if provided
     responsible_id_uuid = None
     if case.responsible_id:
-        responsible = await get_user(db, parse_uuid(case.responsible_id))
+        responsible = get_user(db, parse_uuid(case.responsible_id))
         if not responsible:
             raise ValueError(f"Responsible user with id '{case.responsible_id}' not found")
         if responsible.role not in [models.UserRole.EXECUTOR, models.UserRole.ADMIN]:
@@ -686,7 +686,7 @@ async def create_case(
         responsible_id_uuid = parse_uuid(case.responsible_id)
     
     # Generate unique public_id
-    public_id = await generate_unique_public_id(db)
+    public_id = generate_unique_public_id(db)
     
     # Create case
     db_case = models.Case(
@@ -708,7 +708,7 @@ async def create_case(
     db.refresh(db_case)
     
     # Create initial status history record
-    await create_status_history(
+    create_status_history(
         db=db,
         case_id=db_case.id,
         old_status=None,
@@ -719,7 +719,7 @@ async def create_case(
     return db_case
 
 
-async def get_case(db: Session, case_id: UUID) -> Optional[models.Case]:
+def get_case(db: Session, case_id: UUID) -> Optional[models.Case]:
     """
     Get case by UUID.
     
@@ -736,7 +736,7 @@ async def get_case(db: Session, case_id: UUID) -> Optional[models.Case]:
     return result.scalar_one_or_none()
 
 
-async def get_case_by_public_id(db: Session, public_id: int) -> Optional[models.Case]:
+def get_case_by_public_id(db: Session, public_id: int) -> Optional[models.Case]:
     """
     Get case by public_id (6-digit number).
     
@@ -753,7 +753,7 @@ async def get_case_by_public_id(db: Session, public_id: int) -> Optional[models.
     return result.scalar_one_or_none()
 
 
-async def get_all_cases(
+def get_all_cases(
     db: Session,
     status: Optional[models.CaseStatus] = None,
     category_id: Optional[UUID] = None,
@@ -881,7 +881,7 @@ async def get_all_cases(
     return list(cases), total
 
 
-async def update_case(
+def update_case(
     db: Session,
     case_id: UUID,
     case_update: schemas.CaseUpdate
@@ -902,13 +902,13 @@ async def update_case(
     """
     from uuid import UUID as parse_uuid
     
-    db_case = await get_case(db, case_id)
+    db_case = get_case(db, case_id)
     if not db_case:
         return None
     
     # Update fields if provided
     if case_update.category_id is not None:
-        category = await get_category(db, parse_uuid(case_update.category_id))
+        category = get_category(db, parse_uuid(case_update.category_id))
         if not category:
             raise ValueError(f"Category with id '{case_update.category_id}' not found")
         if not category.is_active:
@@ -916,7 +916,7 @@ async def update_case(
         db_case.category_id = parse_uuid(case_update.category_id)
     
     if case_update.channel_id is not None:
-        channel = await get_channel(db, parse_uuid(case_update.channel_id))
+        channel = get_channel(db, parse_uuid(case_update.channel_id))
         if not channel:
             raise ValueError(f"Channel with id '{case_update.channel_id}' not found")
         if not channel.is_active:
@@ -950,7 +950,7 @@ async def update_case(
         if case_update.responsible_id == "":  # Allow clearing responsible
             db_case.responsible_id = None
         else:
-            responsible = await get_user(db, parse_uuid(case_update.responsible_id))
+            responsible = get_user(db, parse_uuid(case_update.responsible_id))
             if not responsible:
                 raise ValueError(f"Responsible user with id '{case_update.responsible_id}' not found")
             if responsible.role not in [models.UserRole.EXECUTOR, models.UserRole.ADMIN]:
@@ -965,7 +965,7 @@ async def update_case(
     return db_case
 
 
-async def delete_case(db: Session, case_id: UUID) -> bool:
+def delete_case(db: Session, case_id: UUID) -> bool:
     """
     Delete case by ID (hard delete).
     
@@ -978,7 +978,7 @@ async def delete_case(db: Session, case_id: UUID) -> bool:
     Returns:
         True if case was deleted, False if not found
     """
-    db_case = await get_case(db, case_id)
+    db_case = get_case(db, case_id)
     if not db_case:
         return False
     
@@ -988,7 +988,7 @@ async def delete_case(db: Session, case_id: UUID) -> bool:
     return True
 
 
-async def get_executors_for_category(
+def get_executors_for_category(
     db: Session,
     category_id: UUID
 ) -> list[models.User]:
@@ -1015,7 +1015,7 @@ async def get_executors_for_category(
 
 # ==================== Attachment CRUD Operations ====================
 
-async def create_attachment(
+def create_attachment(
     db: Session,
     case_id: UUID,
     file_path: str,
@@ -1043,7 +1043,7 @@ async def create_attachment(
         ValueError: If case doesn't exist
     """
     # Verify case exists
-    case = await get_case(db, case_id)
+    case = get_case(db, case_id)
     if not case:
         raise ValueError(f"Case with id '{case_id}' not found")
     
@@ -1063,7 +1063,7 @@ async def create_attachment(
     return db_attachment
 
 
-async def get_attachment(db: Session, attachment_id: UUID) -> Optional[models.Attachment]:
+def get_attachment(db: Session, attachment_id: UUID) -> Optional[models.Attachment]:
     """
     Get attachment by ID.
     
@@ -1079,7 +1079,7 @@ async def get_attachment(db: Session, attachment_id: UUID) -> Optional[models.At
     ).scalar_one_or_none()
 
 
-async def get_case_attachments(
+def get_case_attachments(
     db: Session,
     case_id: UUID,
     skip: int = 0,
@@ -1104,7 +1104,7 @@ async def get_case_attachments(
     return list(db.execute(query).scalars().all())
 
 
-async def delete_attachment(db: Session, attachment_id: UUID) -> bool:
+def delete_attachment(db: Session, attachment_id: UUID) -> bool:
     """
     Delete attachment record from database.
     
@@ -1118,7 +1118,7 @@ async def delete_attachment(db: Session, attachment_id: UUID) -> bool:
     Returns:
         True if attachment was deleted, False if not found
     """
-    db_attachment = await get_attachment(db, attachment_id)
+    db_attachment = get_attachment(db, attachment_id)
     if not db_attachment:
         return False
     
@@ -1130,7 +1130,7 @@ async def delete_attachment(db: Session, attachment_id: UUID) -> bool:
 
 # ==================== Comment CRUD Operations ====================
 
-async def get_case_comments(
+def get_case_comments(
     db: Session,
     case_id: UUID,
     include_internal: bool = False
@@ -1158,7 +1158,7 @@ async def get_case_comments(
     return list(db.execute(query).scalars().all())
 
 
-async def has_access_to_internal_comments(
+def has_access_to_internal_comments(
     db: Session,
     user: models.User,
     case: models.Case
@@ -1193,7 +1193,7 @@ async def has_access_to_internal_comments(
 
 # ==================== Status History CRUD Operations ====================
 
-async def get_status_history(
+def get_status_history(
     db: Session,
     case_id: UUID
 ) -> list[models.StatusHistory]:
@@ -1214,7 +1214,7 @@ async def get_status_history(
     return list(db.execute(query).scalars().all())
 
 
-async def create_status_history(
+def create_status_history(
     db: Session,
     case_id: UUID,
     old_status: Optional[models.CaseStatus],
@@ -1248,7 +1248,7 @@ async def create_status_history(
     return db_history
 
 
-async def take_case(
+def take_case(
     db: Session,
     case_id: UUID,
     executor_id: UUID
@@ -1273,7 +1273,7 @@ async def take_case(
         ValueError: If case not found, not in NEW status, or executor invalid
     """
     # Get case
-    db_case = await get_case(db, case_id)
+    db_case = get_case(db, case_id)
     if not db_case:
         raise ValueError(f"Case with id '{case_id}' not found")
     
@@ -1282,7 +1282,7 @@ async def take_case(
         raise ValueError(f"Case can only be taken when status is NEW. Current status: {db_case.status.value}")
     
     # Validate executor
-    executor = await get_user(db, executor_id)
+    executor = get_user(db, executor_id)
     if not executor:
         raise ValueError(f"Executor with id '{executor_id}' not found")
     
@@ -1301,7 +1301,7 @@ async def take_case(
     db.refresh(db_case)
     
     # Create status history record
-    await create_status_history(
+    create_status_history(
         db=db,
         case_id=case_id,
         old_status=old_status,
@@ -1312,7 +1312,7 @@ async def take_case(
     return db_case
 
 
-async def change_case_status(
+def change_case_status(
     db: Session,
     case_id: UUID,
     executor_id: UUID,
@@ -1349,12 +1349,12 @@ async def change_case_status(
         ValueError: If validation fails (case not found, not responsible, invalid transition, etc.)
     """
     # Get case
-    db_case = await get_case(db, case_id)
+    db_case = get_case(db, case_id)
     if not db_case:
         raise ValueError(f"Case with id '{case_id}' not found")
     
     # Validate executor
-    executor = await get_user(db, executor_id)
+    executor = get_user(db, executor_id)
     if not executor:
         raise ValueError(f"Executor with id '{executor_id}' not found")
     
@@ -1419,7 +1419,7 @@ async def change_case_status(
         db.refresh(db_case)
         
         # Create status history record
-        await create_status_history(
+        create_status_history(
             db=db,
             case_id=case_id,
             old_status=old_status,

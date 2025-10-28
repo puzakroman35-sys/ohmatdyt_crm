@@ -33,21 +33,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
 
-  // Меню бічної панелі
+  // Меню бічної панелі (динамічне залежно від ролі)
   const sideMenuItems: MenuProps['items'] = [
-    {
+    // Dashboard тільки для ADMIN
+    ...(user?.role === 'ADMIN' ? [{
       key: '/dashboard',
       icon: <DashboardOutlined />,
       label: 'Головна',
       onClick: () => router.push('/dashboard'),
-    },
+    }] : []),
     {
       key: '/cases',
       icon: <FileTextOutlined />,
       label: 'Звернення',
       onClick: () => router.push('/cases'),
     },
-    {
+    // Адміністрування тільки для ADMIN
+    ...(user?.role === 'ADMIN' ? [{
       key: 'admin',
       icon: <SettingOutlined />,
       label: 'Адміністрування',
@@ -68,7 +70,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           onClick: () => router.push('/admin/channels'),
         },
       ],
-    },
+    }] : []),
   ];
 
   // Меню профілю користувача

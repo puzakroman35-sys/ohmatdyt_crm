@@ -43,7 +43,7 @@ async def login(
     - 403: User is not active
     """
     # Find user by username
-    user = await crud.get_user_by_username(db, credentials.username)
+    user = crud.get_user_by_username(db, credentials.username)
     
     if not user:
         raise HTTPException(
@@ -142,7 +142,7 @@ async def refresh_access_token(
     except ValueError:
         raise credentials_exception
     
-    user = await crud.get_user(db, user_uuid)
+    user = crud.get_user(db, user_uuid)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

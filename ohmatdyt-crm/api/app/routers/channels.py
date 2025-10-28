@@ -33,7 +33,7 @@ async def list_channels(
     if limit > 100:
         limit = 100
     
-    db_channels = await crud.get_channels(
+    db_channels = crud.get_channels(
         db, 
         skip=skip, 
         limit=limit,
@@ -75,7 +75,7 @@ async def create_channel(
     Returns created channel.
     """
     try:
-        db_channel = await crud.create_channel(db, channel)
+        db_channel = crud.create_channel(db, channel)
         
         return schemas.ChannelResponse(
             id=str(db_channel.id),
@@ -101,7 +101,7 @@ async def get_channel(
     
     Returns channel details.
     """
-    db_channel = await crud.get_channel(db, channel_id)
+    db_channel = crud.get_channel(db, channel_id)
     
     if not db_channel:
         raise HTTPException(
@@ -136,7 +136,7 @@ async def update_channel(
     Returns updated channel.
     """
     try:
-        db_channel = await crud.update_channel(db, channel_id, channel_update)
+        db_channel = crud.update_channel(db, channel_id, channel_update)
         
         if not db_channel:
             raise HTTPException(
@@ -174,7 +174,7 @@ async def deactivate_channel(
     
     Returns updated channel.
     """
-    db_channel = await crud.deactivate_channel(db, channel_id)
+    db_channel = crud.deactivate_channel(db, channel_id)
     
     if not db_channel:
         raise HTTPException(
@@ -207,7 +207,7 @@ async def activate_channel(
     
     Returns updated channel.
     """
-    db_channel = await crud.activate_channel(db, channel_id)
+    db_channel = crud.activate_channel(db, channel_id)
     
     if not db_channel:
         raise HTTPException(

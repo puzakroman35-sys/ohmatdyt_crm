@@ -57,7 +57,7 @@ async def get_current_user(
     except ValueError:
         raise credentials_exception
     
-    user = await crud.get_user(db, user_uuid)
+    user = crud.get_user(db, user_uuid)
     if user is None:
         raise credentials_exception
     

@@ -3,8 +3,9 @@
  * Ohmatdyt CRM
  */
 
-import React from 'react';
-import { Row, Col, Card, Statistic, Typography } from 'antd';
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { Row, Col, Card, Statistic, Typography, Spin } from 'antd';
 import {
   FileTextOutlined,
   ClockCircleOutlined,
@@ -13,10 +14,54 @@ import {
 } from '@ant-design/icons';
 import MainLayout from '@/components/Layout/MainLayout';
 import { AuthGuard } from '@/components/Auth';
+import { useAppSelector } from '@/store/hooks';
+import { selectUser } from '@/store/slices/authSlice';
 
 const { Title } = Typography;
 
 const DashboardPage: React.FC = () => {
+  const router = useRouter();
+  const user = useAppSelector(selectUser);
+
+  useEffect(() => {
+    // Якщо не ADMIN - редіректимо на cases
+    if (user && user.role !== 'ADMIN') {
+      router.replace('/cases');
+    }
+  }, [user, router]);
+
+  // Показуємо loading якщо ще немає інформації про користувача
+  if (!user) {
+    return (
+      <AuthGuard>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '100vh' 
+        }}>
+          <Spin size="large" tip="Завантаження..." />
+        </div>
+      </AuthGuard>
+    );
+  }
+
+  // Якщо не ADMIN, показуємо loading під час редіректу
+  if (user.role !== 'ADMIN') {
+    return (
+      <AuthGuard>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '100vh' 
+        }}>
+          <Spin size="large" tip="Перенаправлення..." />
+        </div>
+      </AuthGuard>
+    );
+  }
+
   // TODO: Замінити на реальні дані з API
   const stats = {
     total: 0,

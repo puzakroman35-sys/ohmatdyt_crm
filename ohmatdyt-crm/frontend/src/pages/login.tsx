@@ -29,7 +29,7 @@ const LoginPage: React.FC = () => {
   const [form] = Form.useForm();
 
   // Отримуємо returnUrl з query параметрів
-  const returnUrl = (router.query.returnUrl as string) || '/dashboard';
+  const returnUrl = (router.query.returnUrl as string) || '/cases';
 
   const onFinish = async (values: LoginForm) => {
     try {
@@ -72,8 +72,18 @@ const LoginPage: React.FC = () => {
 
       message.success('Успішний вхід!');
       
-      // Редіректимо на returnUrl або на dashboard
-      router.push(returnUrl);
+      // Редіректимо на returnUrl або залежно від ролі
+      if (returnUrl !== '/cases' && returnUrl !== '/dashboard') {
+        // Якщо є спеціальний returnUrl - йдемо туди
+        router.push(returnUrl);
+      } else {
+        // Інакше - ADMIN на dashboard, інші на cases
+        if (data.user.role === 'ADMIN') {
+          router.push('/dashboard');
+        } else {
+          router.push('/cases');
+        }
+      }
     } catch (err: any) {
       dispatch(loginFailure(err.message || 'Помилка входу'));
       message.error(err.message || 'Помилка входу');

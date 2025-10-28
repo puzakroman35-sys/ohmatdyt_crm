@@ -4,9 +4,16 @@
  */
 
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import api from '@/lib/api';
 
 // Типи
-export type CaseStatus = 'NEW' | 'IN_PROGRESS' | 'NEEDS_INFO' | 'REJECTED' | 'DONE';
+export enum CaseStatus {
+  NEW = 'NEW',
+  IN_PROGRESS = 'IN_PROGRESS',
+  NEEDS_INFO = 'NEEDS_INFO',
+  REJECTED = 'REJECTED',
+  DONE = 'DONE',
+}
 
 export interface Category {
   id: string;
@@ -66,43 +73,33 @@ export const fetchCasesAsync = createAsyncThunk(
     try {
       const { endpoint = '/api/cases', filters = {}, pagination = { skip: 0, limit: 50 }, sort } = params;
 
-      const queryParams = new URLSearchParams({
-        skip: pagination.skip.toString(),
-        limit: pagination.limit.toString(),
-      });
+      const queryParams: Record<string, any> = {
+        skip: pagination.skip,
+        limit: pagination.limit,
+      };
 
       // Додавання фільтрів
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
-          if (Array.isArray(value)) {
-            value.forEach(v => queryParams.append(key, v));
-          } else {
-            queryParams.append(key, value.toString());
-          }
+          queryParams[key] = value;
         }
       });
 
       // Додавання сортування
       if (sort) {
         const orderBy = sort.order === 'desc' ? `-${sort.field}` : sort.field;
-        queryParams.append('order_by', orderBy);
+        queryParams.order_by = orderBy;
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${endpoint}?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json',
-        },
+      // Використовуємо api клієнт, який автоматично додає JWT токен
+      const response = await api.get(endpoint, {
+        params: queryParams,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
+      return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.message);
+      console.error('fetchCasesAsync error:', error);
+      return rejectWithValue(error.response?.data?.detail || error.message);
     }
   }
 );

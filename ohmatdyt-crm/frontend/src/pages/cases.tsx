@@ -144,6 +144,17 @@ const CasesPage: React.FC = () => {
     }
   }, [user, pagination.current, pagination.pageSize, sorter, filters]);
 
+  // Автооновлення кожні 30 секунд
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(() => {
+      loadCases();
+    }, 30000); // 30 секунд
+
+    return () => clearInterval(interval);
+  }, [user, pagination.current, pagination.pageSize, sorter, filters]);
+
   // Обробка зміни пагінації
   const handleTableChange = (pagination: any, filters: any, sorter: any) => {
     setPagination(prev => ({

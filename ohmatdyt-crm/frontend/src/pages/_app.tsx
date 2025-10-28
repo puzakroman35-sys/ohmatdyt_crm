@@ -8,13 +8,16 @@ import { Provider } from 'react-redux';
 import { ConfigProvider } from 'antd';
 import { store } from '@/store';
 import { antdConfig } from '@/config/theme';
+import { AuthProvider } from '@/components/Auth';
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
     <Provider store={store}>
-      <ConfigProvider theme={antdConfig.theme} locale={antdConfig.locale}>
-        <Component {...pageProps} />
-      </ConfigProvider>
+      <AuthProvider>
+        <ConfigProvider theme={antdConfig.theme} locale={antdConfig.locale}>
+          <Component {...pageProps} />
+        </ConfigProvider>
+      </AuthProvider>
     </Provider>
   );
 }

@@ -106,7 +106,7 @@ async def create_user(
     Requires: Admin privileges
     """
     try:
-        db_user = await crud.create_user(db, user)
+        db_user = crud.create_user(db, user)
         return db_user
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -142,7 +142,7 @@ async def get_user(
             detail="Not authorized to view this user"
         )
     
-    db_user = await crud.get_user(db, user_id)
+    db_user = crud.get_user(db, user_id)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return db_user
@@ -171,7 +171,7 @@ async def list_users(
     if limit > 100:
         limit = 100
     
-    db_users = await crud.get_users(db, skip=skip, limit=limit, role=role, is_active=is_active)
+    db_users = crud.get_users(db, skip=skip, limit=limit, role=role, is_active=is_active)
     total = len(db_users)  # TODO: Add proper count query
     
     # Convert User models to UserResponse schemas
@@ -232,7 +232,7 @@ async def update_user(
             )
     
     try:
-        db_user = await crud.update_user(db, user_id, user_update)
+        db_user = crud.update_user(db, user_id, user_update)
         if not db_user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         return db_user
@@ -259,7 +259,7 @@ async def update_user_password(
             detail="Not authorized to update this user's password"
         )
     
-    db_user = await crud.update_user_password(db, user_id, password_update)
+    db_user = crud.update_user_password(db, user_id, password_update)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return db_user
@@ -276,7 +276,7 @@ async def delete_user(
     
     Requires: Admin privileges
     """
-    deleted = await crud.delete_user(db, user_id)
+    deleted = crud.delete_user(db, user_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return None
@@ -293,7 +293,7 @@ async def deactivate_user(
     
     Requires: Admin privileges
     """
-    db_user = await crud.deactivate_user(db, user_id)
+    db_user = crud.deactivate_user(db, user_id)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return db_user
@@ -310,7 +310,7 @@ async def activate_user(
     
     Requires: Admin privileges
     """
-    db_user = await crud.activate_user(db, user_id)
+    db_user = crud.activate_user(db, user_id)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return db_user

@@ -33,7 +33,7 @@ async def list_categories(
     if limit > 100:
         limit = 100
     
-    db_categories = await crud.get_categories(
+    db_categories = crud.get_categories(
         db, 
         skip=skip, 
         limit=limit,
@@ -75,7 +75,7 @@ async def create_category(
     Returns created category.
     """
     try:
-        db_category = await crud.create_category(db, category)
+        db_category = crud.create_category(db, category)
         
         return schemas.CategoryResponse(
             id=str(db_category.id),
@@ -101,7 +101,7 @@ async def get_category(
     
     Returns category details.
     """
-    db_category = await crud.get_category(db, category_id)
+    db_category = crud.get_category(db, category_id)
     
     if not db_category:
         raise HTTPException(
@@ -136,7 +136,7 @@ async def update_category(
     Returns updated category.
     """
     try:
-        db_category = await crud.update_category(db, category_id, category_update)
+        db_category = crud.update_category(db, category_id, category_update)
         
         if not db_category:
             raise HTTPException(
@@ -174,7 +174,7 @@ async def deactivate_category(
     
     Returns updated category.
     """
-    db_category = await crud.deactivate_category(db, category_id)
+    db_category = crud.deactivate_category(db, category_id)
     
     if not db_category:
         raise HTTPException(
@@ -207,7 +207,7 @@ async def activate_category(
     
     Returns updated category.
     """
-    db_category = await crud.activate_category(db, category_id)
+    db_category = crud.activate_category(db, category_id)
     
     if not db_category:
         raise HTTPException(

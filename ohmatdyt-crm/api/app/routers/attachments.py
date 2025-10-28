@@ -48,7 +48,7 @@ async def upload_attachment(
     Requires authentication.
     """
     # Verify case exists
-    case = await crud.get_case(db, case_id)
+    case = crud.get_case(db, case_id)
     if not case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -113,7 +113,7 @@ async def upload_attachment(
     
     # Create database record
     try:
-        db_attachment = await crud.create_attachment(
+        db_attachment = crud.create_attachment(
             db=db,
             case_id=case_id,
             file_path=relative_path,
@@ -150,7 +150,7 @@ async def list_case_attachments(
     - EXECUTOR/ADMIN: can view attachments for all cases
     """
     # Verify case exists
-    case = await crud.get_case(db, case_id)
+    case = crud.get_case(db, case_id)
     if not case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -164,7 +164,7 @@ async def list_case_attachments(
             detail="Not authorized to view attachments for this case"
         )
     
-    attachments = await crud.get_case_attachments(db, case_id, skip=skip, limit=limit)
+    attachments = crud.get_case_attachments(db, case_id, skip=skip, limit=limit)
     
     # Convert to response models
     attachment_responses = [
@@ -201,7 +201,7 @@ async def download_attachment(
     - EXECUTOR/ADMIN: can download all attachments
     """
     # Get attachment
-    attachment = await crud.get_attachment(db, attachment_id)
+    attachment = crud.get_attachment(db, attachment_id)
     if not attachment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -209,7 +209,7 @@ async def download_attachment(
         )
     
     # Get associated case for permission check
-    case = await crud.get_case(db, attachment.case_id)
+    case = crud.get_case(db, attachment.case_id)
     if not case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -257,7 +257,7 @@ async def delete_attachment(
     - EXECUTOR: cannot delete attachments
     """
     # Get attachment
-    attachment = await crud.get_attachment(db, attachment_id)
+    attachment = crud.get_attachment(db, attachment_id)
     if not attachment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -265,7 +265,7 @@ async def delete_attachment(
         )
     
     # Get associated case for permission check
-    case = await crud.get_case(db, attachment.case_id)
+    case = crud.get_case(db, attachment.case_id)
     if not case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -296,7 +296,7 @@ async def delete_attachment(
             print(f"Warning: Failed to delete file {full_path}: {str(e)}")
     
     # Delete database record
-    deleted = await crud.delete_attachment(db, attachment_id)
+    deleted = crud.delete_attachment(db, attachment_id)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

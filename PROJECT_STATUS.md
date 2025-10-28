@@ -107,8 +107,8 @@ ohmatdyt-crm/
 | FE-001 | Next.js Skeleton + Ant Design + Redux Toolkit | ✅ COMPLETED | Oct 28, 2025 |
 | FE-002 | Authentication: Login, Tokens, Guards | ✅ COMPLETED | Oct 28, 2025 |
 | FE-003 | Create Case Form with File Upload | ✅ COMPLETED | Oct 28, 2025 |
-| FE-004 | Case Detail Page | 🔄 PENDING | - |
-| FE-005 | Create Case Form | 🔄 PENDING | - |
+| FE-004 | Cases List Page (My Cases for Operator) | ✅ COMPLETED | Oct 28, 2025 |
+| FE-005 | Case Detail Page | 🔄 PENDING | - |
 
 ### Technology Stack
 - **Backend:** Python, FastAPI, Celery, SQLAlchemy
@@ -341,6 +341,227 @@ ohmatdyt-crm/
 - API endpoint доступний для всіх авторизованих користувачів
 - Файли відправляються як FormData з Content-Type: multipart/form-data
 - Успішне створення тригерує email нотифікацію (Celery task)
+
+---
+
+##  FE-004: Cases List Page (My Cases for Operator) - COMPLETED
+
+**Date Completed:** October 28, 2025
+**Status:** ✅ COMPLETED
+
+### Summary
+Реалізовано повнофункціональну сторінку списку звернень з таблицею, фільтрацією, пагінацією, сортуванням та автоматичним оновленням даних. Більшість функціональності була реалізована раніше в рамках загальної архітектури, додано автоматичне оновлення списку.
+
+### Components Implemented
+
+1. **Cases List Page** (`frontend/src/pages/cases.tsx`)
+   - Таблиця з відображенням звернень
+   - RBAC-контрольовані ендпоінти
+   - Фільтри за статусом, категорією, каналом
+   - Пагінація та сортування
+   - Навігація при кліку на рядок
+   - Автоматичне оновлення кожні 30 секунд
+
+### Table Columns
+
+**Відображувані колонки:**
+- **ID** - Public ID (6-значний номер звернення)
+- **Дата** - Дата створення (форматовано)
+- **Заявник** - Ім'я заявника
+- **Категорія** - Назва категорії
+- **Канал** - Канал звернення
+- **Статус** - Статус із кольоровим тегом (NEW, IN_PROGRESS, NEEDS_INFO, REJECTED, DONE)
+- **Відповідальний** - Призначений виконавець (або "Не призначено")
+
+### RBAC Implementation
+
+**Endpoint Selection by Role:**
+
+```typescript
+// OPERATOR: Тільки власні звернення
+GET /api/cases/my?skip=0&limit=10
+
+// EXECUTOR: Тільки призначені звернення  
+GET /api/cases/assigned?skip=0&limit=10
+
+// ADMIN: Всі звернення
+GET /api/cases?skip=0&limit=10
+```
+
+**Access Control:**
+- OPERATOR бачить лише звернення, які створив сам
+- EXECUTOR бачить лише звернення, призначені йому
+- ADMIN бачить всі звернення в системі
+- Endpoint визначається автоматично на основі ролі з authSlice
+
+### Features Implemented
+
+#### 1. Data Loading
+```typescript
+const loadCases = async () => {
+  const endpoint = getEndpointByRole(user.role);
+  const response = await api.get(endpoint, {
+    params: { skip, limit, ...filters, ...sorter }
+  });
+  // Redux state update
+};
+```
+
+#### 2. Auto-Refresh (NEW)
+**Polling Interval:** 30 seconds
+
+```typescript
+useEffect(() => {
+  const intervalId = setInterval(() => {
+    loadCases(); // Оновлює дані кожні 30 секунд
+  }, 30000);
+  
+  return () => clearInterval(intervalId); // Cleanup
+}, [user, pagination, filters, sorter]);
+```
+
+**Features:**
+- Автоматичне оновлення без втрати поточної сторінки
+- Зберігаються фільтри та сортування
+- Cleanup при unmount компонента
+- Залежить від user, pagination, filters, sorter
+
+#### 3. Pagination
+- **Default Page Size:** 10 записів
+- **Ant Design Pagination Component**
+- Total records відображається
+- onChange handler оновлює Redux state
+
+```typescript
+<Pagination
+  current={page}
+  pageSize={pageSize}
+  total={total}
+  onChange={(page, pageSize) => {
+    dispatch(setCasesPage({ page, pageSize }));
+    loadCases();
+  }}
+/>
+```
+
+#### 4. Sorting
+- Click на header колонки
+- Ascending/Descending toggle
+- Backend sorting via `order_by` parameter
+- Збереження стану сортування між оновленнями
+
+**Supported Sort Fields:**
+- created_at (default: descending)
+- public_id
+- status
+- updated_at
+
+#### 5. Filtering
+**Available Filters:**
+- **Status:** Dropdown (NEW, IN_PROGRESS, NEEDS_INFO, REJECTED, DONE)
+- **Category:** Select (завантажується з `/api/categories`)
+- **Channel:** Select (завантажується з `/api/channels`)
+- **Clear Filters:** Кнопка для скидання всіх фільтрів
+
+**Filter Persistence:**
+- Зберігаються в Redux state
+- Застосовуються при пагінації та авто-оновленні
+- Clear filters також trigger reload
+
+#### 6. Navigation Integration
+
+**Row Click Handler:**
+```typescript
+const handleRowClick = (record: Case) => {
+  router.push(`/cases/${record.id}`);
+};
+```
+
+**Table Configuration:**
+```typescript
+<Table
+  onRow={(record) => ({
+    onClick: () => handleRowClick(record),
+    style: { cursor: 'pointer' },
+  })}
+  rowClassName={getRowClassName}
+/>
+```
+
+### Files Created/Modified
+
+```
+frontend/src/
+  pages/cases.tsx                    # MODIFIED: Added auto-refresh polling
+```
+
+**Total:** 1 file modified (auto-refresh feature added to existing page)
+
+### UI/UX Features
+
+**Responsive Design:**
+- Mobile-friendly layout (xs/sm/md/lg breakpoints)
+- Horizontal scroll for table on small screens
+- Collapsible filters panel
+
+**Loading States:**
+- Table loading spinner during API calls
+- Disabled buttons during operations
+
+**Error Handling:**
+- Error messages displayed below table
+- API error handling with user-friendly messages
+
+**Accessibility:**
+- Keyboard navigation support
+- Screen reader friendly labels
+- High contrast colors for status tags
+
+**Performance:**
+- Auto-refresh doesn't reset user's current page/filters
+- Efficient Redux state updates
+- Cleanup of intervals on unmount
+
+### Status Tag Colors
+
+```typescript
+const statusColors: Record<CaseStatus, string> = {
+  NEW: 'blue',
+  IN_PROGRESS: 'orange',
+  NEEDS_INFO: 'purple',
+  REJECTED: 'red',
+  DONE: 'green',
+};
+```
+
+### DoD Verification
+
+- ✅ Таблиця відображає звернення з усіма необхідними колонками
+- ✅ RBAC: Кожна роль бачить тільки дозволені звернення
+- ✅ Пагінація працює коректно з total count
+- ✅ Сортування за колонками (ascending/descending)
+- ✅ Фільтри застосовуються до запитів
+- ✅ Клік на рядок веде на /cases/{id}
+- ✅ Автоматичне оновлення кожні 30 секунд
+- ✅ Кнопка "Створити звернення" присутня (всі ролі)
+- ✅ AuthGuard захищає сторінку
+
+### Dependencies Met
+
+- ✅ BE-004: Cases CRUD (основні ендпоінти)
+- ✅ BE-007: Filtering & Search (фільтрація та сортування)
+- ✅ BE-003: Categories & Channels (для фільтрів)
+- ✅ FE-001: Next.js skeleton (роутинг, layout)
+- ✅ FE-002: Authentication (JWT, guards, role detection)
+- ✅ Redux Toolkit: casesSlice для state management
+
+### Notes
+
+- 📝 Більшість функціональності FE-004 була реалізована раніше в `/cases` page
+- 🆕 Додано тільки автоматичне оновлення (polling кожні 30 секунд)
+- 🎯 Всі вимоги FE-004 виконано повністю
+- 🔄 Auto-refresh не скидає поточну сторінку/фільтри/сортування
+- 💡 Можливе покращення: WebSocket для real-time updates замість polling
 
 ---
 

@@ -126,7 +126,7 @@ async def create_case_with_attachments(
             responsible_id=None  # Will be assigned later
         )
         
-        db_case = await crud.create_case(db, case_create, current_user.id)
+        db_case = crud.create_case(db, case_create, current_user.id)
         
     except ValueError as e:
         raise HTTPException(
@@ -166,7 +166,7 @@ async def create_case_with_attachments(
                     f.write(file_content)
             except Exception as e:
                 # Rollback: delete case if file save fails
-                await crud.delete_case(db, db_case.id)
+                crud.delete_case(db, db_case.id)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Failed to save file '{file.filename}': {str(e)}"
@@ -174,7 +174,7 @@ async def create_case_with_attachments(
             
             # Create database record for attachment
             try:
-                db_attachment = await crud.create_attachment(
+                db_attachment = crud.create_attachment(
                     db=db,
                     case_id=db_case.id,
                     file_path=relative_path,
@@ -272,7 +272,7 @@ async def list_my_cases(
         limit = 100
     
     # Force author_id to current user
-    cases, total = await crud.get_all_cases(
+    cases, total = crud.get_all_cases(
         db=db,
         status=status,
         category_id=category_id,
@@ -366,7 +366,7 @@ async def list_assigned_cases(
     # For ADMIN: show all assigned to them (or could show all - configurable)
     responsible_filter = current_user.id if current_user.role == models.UserRole.EXECUTOR else None
     
-    cases, total = await crud.get_all_cases(
+    cases, total = crud.get_all_cases(
         db=db,
         status=status,
         category_id=category_id,
@@ -433,7 +433,7 @@ async def get_case(
     - OPERATOR: can view own cases
     - EXECUTOR/ADMIN: can view all cases
     """
-    db_case = await crud.get_case(db, case_id)
+    db_case = crud.get_case(db, case_id)
     if not db_case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -448,7 +448,7 @@ async def get_case(
         )
     
     # Get category details
-    category = await crud.get_category(db, db_case.category_id)
+    category = crud.get_category(db, db_case.category_id)
     category_response = schemas.CategoryResponse(
         id=str(category.id),
         name=category.name,
@@ -458,7 +458,7 @@ async def get_case(
     )
     
     # Get channel details
-    channel = await crud.get_channel(db, db_case.channel_id)
+    channel = crud.get_channel(db, db_case.channel_id)
     channel_response = schemas.ChannelResponse(
         id=str(channel.id),
         name=channel.name,
@@ -468,7 +468,7 @@ async def get_case(
     )
     
     # Get author details
-    author = await crud.get_user(db, db_case.author_id)
+    author = crud.get_user(db, db_case.author_id)
     author_response = schemas.UserResponse(
         id=str(author.id),
         username=author.username,
@@ -483,7 +483,7 @@ async def get_case(
     # Get responsible details (if assigned)
     responsible_response = None
     if db_case.responsible_id:
-        responsible = await crud.get_user(db, db_case.responsible_id)
+        responsible = crud.get_user(db, db_case.responsible_id)
         if responsible:
             responsible_response = schemas.UserResponse(
                 id=str(responsible.id),
@@ -497,10 +497,10 @@ async def get_case(
             )
     
     # Get status history
-    status_history = await crud.get_status_history(db, db_case.id)
+    status_history = crud.get_status_history(db, db_case.id)
     status_history_responses = []
     for history in status_history:
-        changed_by = await crud.get_user(db, history.changed_by_id)
+        changed_by = crud.get_user(db, history.changed_by_id)
         changed_by_response = schemas.UserResponse(
             id=str(changed_by.id),
             username=changed_by.username,
@@ -523,12 +523,12 @@ async def get_case(
         ))
     
     # Get comments (filtered by visibility)
-    has_internal_access = await crud.has_access_to_internal_comments(db, current_user, db_case)
-    comments = await crud.get_case_comments(db, db_case.id, include_internal=has_internal_access)
+    has_internal_access = crud.has_access_to_internal_comments(db, current_user, db_case)
+    comments = crud.get_case_comments(db, db_case.id, include_internal=has_internal_access)
     
     comment_responses = []
     for comment in comments:
-        comment_author = await crud.get_user(db, comment.author_id)
+        comment_author = crud.get_user(db, comment.author_id)
         comment_author_response = schemas.UserResponse(
             id=str(comment_author.id),
             username=comment_author.username,
@@ -551,10 +551,10 @@ async def get_case(
         ))
     
     # Get attachments
-    attachments = await crud.get_case_attachments(db, db_case.id)
+    attachments = crud.get_case_attachments(db, db_case.id)
     attachment_responses = []
     for attachment in attachments:
-        uploaded_by = await crud.get_user(db, attachment.uploaded_by_id)
+        uploaded_by = crud.get_user(db, attachment.uploaded_by_id)
         uploaded_by_response = schemas.UserResponse(
             id=str(uploaded_by.id),
             username=uploaded_by.username,
@@ -653,7 +653,7 @@ async def list_cases(
     if current_user.role == models.UserRole.OPERATOR:
         author_id = current_user.id
     
-    cases, total = await crud.get_all_cases(
+    cases, total = crud.get_all_cases(
         db=db,
         status=status,
         category_id=category_id,
@@ -742,7 +742,7 @@ async def take_case_into_work(
     
     # Take case
     try:
-        db_case = await crud.take_case(
+        db_case = crud.take_case(
             db=db,
             case_id=case_id,
             executor_id=current_user.id
@@ -839,7 +839,7 @@ async def change_case_status(
     """
     # Take case
     try:
-        db_case = await crud.change_case_status(
+        db_case = crud.change_case_status(
             db=db,
             case_id=case_id,
             executor_id=current_user.id,

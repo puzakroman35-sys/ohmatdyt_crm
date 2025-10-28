@@ -79,7 +79,7 @@ const clearStorage = () => {
   }
 };
 
-// Початковий стан з завантаженням з localStorage
+// Початковий стан
 const initialState: AuthState = {
   user: null,
   accessToken: null,
@@ -87,7 +87,6 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isLoading: false,
   error: null,
-  ...loadStateFromStorage(),
 };
 
 // Slice
