@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.models import Case
 
 
-async def generate_unique_public_id(db: Session, max_attempts: int = 10) -> int:
+def generate_unique_public_id(db: Session, max_attempts: int = 10) -> int:
     """
     Generate a unique 6-digit public_id for a Case.
     

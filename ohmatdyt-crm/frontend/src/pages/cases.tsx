@@ -18,11 +18,13 @@ import {
   Col,
   message,
   Spin,
+  Popconfirm,
 } from 'antd';
 import {
   SearchOutlined,
   FilterOutlined,
   ReloadOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useRouter } from 'next/router';
@@ -32,14 +34,17 @@ import { AuthGuard } from '@/components/Auth';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   fetchCasesAsync,
+  takeCaseAsync,
   selectCases,
   selectCasesLoading,
   selectCasesError,
   selectCasesTotal,
   Case,
   CaseStatus,
+  Category,
 } from '@/store/slices/casesSlice';
 import { selectUser } from '@/store/slices/authSlice';
+import api from '@/lib/api';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -72,6 +77,10 @@ const CasesPage: React.FC = () => {
   const error = useAppSelector(selectCasesError);
   const total = useAppSelector(selectCasesTotal);
 
+  // Список категорій для фільтру
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+
   // Стан фільтрів
   const [filters, setFilters] = useState({
     status: undefined as CaseStatus | undefined,
@@ -79,6 +88,7 @@ const CasesPage: React.FC = () => {
     channel_id: undefined as string | undefined,
     dateRange: undefined as [dayjs.Dayjs, dayjs.Dayjs] | undefined,
     search: '',
+    overdue: undefined as boolean | undefined,
   });
 
   // Стан пагінації
@@ -97,6 +107,36 @@ const CasesPage: React.FC = () => {
     order: 'descend' as 'ascend' | 'descend',
   });
 
+  // Завантаження категорій при монтажі
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setLoadingCategories(true);
+      try {
+        const response = await api.get('/api/categories', {
+          params: { is_active: true }
+        });
+        // API може повертати масив або об'єкт з масивом
+        const data = response.data;
+        if (Array.isArray(data)) {
+          setCategories(data);
+        } else if (data && Array.isArray(data.categories)) {
+          setCategories(data.categories);
+        } else {
+          console.warn('Unexpected categories response format:', data);
+          setCategories([]);
+        }
+      } catch (err) {
+        console.error('Failed to load categories:', err);
+        message.error('Помилка завантаження категорій');
+        setCategories([]);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
   // Завантаження даних
   const loadCases = () => {
     if (!user) return;
@@ -114,6 +154,7 @@ const CasesPage: React.FC = () => {
     if (filters.status) apiFilters.status = filters.status;
     if (filters.category_id) apiFilters.category_id = filters.category_id;
     if (filters.channel_id) apiFilters.channel_id = filters.channel_id;
+    if (filters.overdue !== undefined) apiFilters.overdue = filters.overdue;
     if (filters.dateRange) {
       apiFilters.date_from = filters.dateRange[0].format('YYYY-MM-DD');
       apiFilters.date_to = filters.dateRange[1].format('YYYY-MM-DD');
@@ -174,6 +215,19 @@ const CasesPage: React.FC = () => {
   // Обробка кліку на рядок
   const handleRowClick = (record: Case) => {
     router.push(`/cases/${record.id}`);
+  };
+
+  // Обробка "Взяти в роботу"
+  const handleTakeCase = async (caseId: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Запобігти навігації до деталей
+    
+    try {
+      await dispatch(takeCaseAsync(caseId)).unwrap();
+      message.success('Звернення взято в роботу');
+      loadCases(); // Оновити список
+    } catch (err: any) {
+      message.error(err || 'Помилка при взятті звернення в роботу');
+    }
   };
 
   // Колонки таблиці
@@ -239,6 +293,40 @@ const CasesPage: React.FC = () => {
     },
   ];
 
+  // Додати колонку "Дії" для виконавців
+  if (user?.role === 'EXECUTOR') {
+    columns.push({
+      title: 'Дії',
+      key: 'actions',
+      width: 120,
+      render: (_, record) => {
+        // Показуємо кнопку "Взяти в роботу" тільки для звернень зі статусом NEW
+        if (record.status === CaseStatus.NEW && !record.responsible_id) {
+          return (
+            <Popconfirm
+              title="Взяти звернення в роботу?"
+              description="Ви станете відповідальним за це звернення"
+              onConfirm={(e) => handleTakeCase(record.id, e as any)}
+              okText="Так"
+              cancelText="Ні"
+              onCancel={(e) => e?.stopPropagation()}
+            >
+              <Button
+                type="primary"
+                size="small"
+                icon={<CheckCircleOutlined />}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Взяти
+              </Button>
+            </Popconfirm>
+          );
+        }
+        return null;
+      },
+    });
+  }
+
   // Перевірка чи прострочено звернення (більше 7 днів)
   const isOverdue = (createdAt: string, status: CaseStatus) => {
     if (status === 'DONE' || status === 'REJECTED') return false;
@@ -293,7 +381,23 @@ const CasesPage: React.FC = () => {
                 ))}
               </Select>
             </Col>
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={24} sm={12} md={5}>
+              <Select
+                placeholder="Категорія"
+                style={{ width: '100%' }}
+                value={filters.category_id}
+                onChange={(value) => setFilters(prev => ({ ...prev, category_id: value }))}
+                allowClear
+                loading={loadingCategories}
+                showSearch
+                optionFilterProp="children"
+              >
+                {categories.map((cat) => (
+                  <Option key={cat.id} value={cat.id}>{cat.name}</Option>
+                ))}
+              </Select>
+            </Col>
+            <Col xs={24} sm={12} md={5}>
               <RangePicker
                 placeholder={['Дата від', 'Дата до']}
                 style={{ width: '100%' }}
@@ -303,6 +407,20 @@ const CasesPage: React.FC = () => {
               />
             </Col>
             <Col xs={24} sm={12} md={4}>
+              <Select
+                placeholder="Прострочені"
+                style={{ width: '100%' }}
+                value={filters.overdue}
+                onChange={(value) => setFilters(prev => ({ ...prev, overdue: value }))}
+                allowClear
+              >
+                <Option value={true}>Так</Option>
+                <Option value={false}>Ні</Option>
+              </Select>
+            </Col>
+          </Row>
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col>
               <Space>
                 <Button
                   icon={<FilterOutlined />}
@@ -319,6 +437,7 @@ const CasesPage: React.FC = () => {
                       channel_id: undefined,
                       dateRange: undefined,
                       search: '',
+                      overdue: undefined,
                     });
                     loadCases();
                   }}

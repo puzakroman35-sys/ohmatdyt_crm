@@ -104,6 +104,20 @@ export const fetchCasesAsync = createAsyncThunk(
   }
 );
 
+// Взяти звернення в роботу (тільки для EXECUTOR)
+export const takeCaseAsync = createAsyncThunk(
+  'cases/takeCase',
+  async (caseId: string, { rejectWithValue }) => {
+    try {
+      const response = await api.post(`/api/cases/${caseId}/take`);
+      return response.data;
+    } catch (error: any) {
+      console.error('takeCaseAsync error:', error);
+      return rejectWithValue(error.response?.data?.detail || error.message);
+    }
+  }
+);
+
 export interface CasesState {
   cases: Case[];
   currentCase: Case | null;
@@ -234,6 +248,23 @@ const casesSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchCasesAsync.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(takeCaseAsync.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(takeCaseAsync.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Оновлюємо звернення в списку
+        const index = state.cases.findIndex((c) => c.id === action.payload.id);
+        if (index !== -1) {
+          state.cases[index] = action.payload;
+        }
+        state.error = null;
+      })
+      .addCase(takeCaseAsync.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });
