@@ -24,7 +24,62 @@ export interface AuthState {
   error: string | null;
 }
 
-// Початковий стан
+// Завантаження стану з localStorage
+const loadStateFromStorage = (): Partial<AuthState> => {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const savedState = localStorage.getItem('auth');
+    if (savedState) {
+      const parsed = JSON.parse(savedState);
+      return {
+        user: parsed.user,
+        accessToken: parsed.accessToken,
+        refreshToken: parsed.refreshToken,
+        isAuthenticated: !!parsed.accessToken,
+      };
+    }
+  } catch (error) {
+    console.error('Failed to load auth state from localStorage:', error);
+  }
+
+  return {};
+};
+
+// Збереження стану в localStorage
+const saveStateToStorage = (state: AuthState) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    const stateToSave = {
+      user: state.user,
+      accessToken: state.accessToken,
+      refreshToken: state.refreshToken,
+    };
+    localStorage.setItem('auth', JSON.stringify(stateToSave));
+  } catch (error) {
+    console.error('Failed to save auth state to localStorage:', error);
+  }
+};
+
+// Очищення localStorage
+const clearStorage = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    localStorage.removeItem('auth');
+  } catch (error) {
+    console.error('Failed to clear auth state from localStorage:', error);
+  }
+};
+
+// Початковий стан з завантаженням з localStorage
 const initialState: AuthState = {
   user: null,
   accessToken: null,
@@ -32,6 +87,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isLoading: false,
   error: null,
+  ...loadStateFromStorage(),
 };
 
 // Slice
@@ -60,6 +116,9 @@ const authSlice = createSlice({
       state.accessToken = action.payload.accessToken;
       state.refreshToken = action.payload.refreshToken;
       state.error = null;
+      
+      // Зберігаємо в localStorage
+      saveStateToStorage(state);
     },
     
     // Помилка логіну
@@ -76,6 +135,9 @@ const authSlice = createSlice({
       state.refreshToken = null;
       state.isAuthenticated = false;
       state.error = null;
+      
+      // Очищаємо localStorage
+      clearStorage();
     },
     
     // Оновлення токену
@@ -88,6 +150,9 @@ const authSlice = createSlice({
     ) => {
       state.accessToken = action.payload.accessToken;
       state.refreshToken = action.payload.refreshToken;
+      
+      // Зберігаємо в localStorage
+      saveStateToStorage(state);
     },
     
     // Очистити помилку

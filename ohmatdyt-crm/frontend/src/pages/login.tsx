@@ -28,6 +28,9 @@ const LoginPage: React.FC = () => {
   const { isLoading, error } = useAppSelector(selectAuth);
   const [form] = Form.useForm();
 
+  // Отримуємо returnUrl з query параметрів
+  const returnUrl = (router.query.returnUrl as string) || '/dashboard';
+
   const onFinish = async (values: LoginForm) => {
     try {
       dispatch(loginStart());
@@ -66,7 +69,9 @@ const LoginPage: React.FC = () => {
       );
 
       message.success('Успішний вхід!');
-      router.push('/dashboard');
+      
+      // Редіректимо на returnUrl або на dashboard
+      router.push(returnUrl);
     } catch (err: any) {
       dispatch(loginFailure(err.message || 'Помилка входу'));
       message.error(err.message || 'Помилка входу');
