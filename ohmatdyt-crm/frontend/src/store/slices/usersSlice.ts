@@ -426,11 +426,11 @@ const usersSlice = createSlice({
 export const { clearError, clearCurrentUser, setCurrentUser } = usersSlice.actions;
 
 // Селектори
-export const selectUsers = (state: { users: UsersState }) => state.users.users;
-export const selectUsersTotal = (state: { users: UsersState }) => state.users.total;
-export const selectUsersLoading = (state: { users: UsersState }) => state.users.isLoading;
-export const selectUsersError = (state: { users: UsersState }) => state.users.error;
-export const selectCurrentUser = (state: { users: UsersState }) => state.users.currentUser;
+export const selectUsers = (state: any) => state.users?.users || [];
+export const selectUsersTotal = (state: any) => state.users?.total || 0;
+export const selectUsersLoading = (state: any) => state.users?.isLoading || false;
+export const selectUsersError = (state: any) => state.users?.error || null;
+export const selectCurrentUser = (state: any) => state.users?.currentUser || null;
 
 // Експорт reducer
 export default usersSlice.reducer;

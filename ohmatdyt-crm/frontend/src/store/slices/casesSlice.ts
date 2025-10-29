@@ -289,15 +289,15 @@ export const {
 } = casesSlice.actions;
 
 // Селектори
-export const selectCases = (state: { cases: CasesState }) => state.cases.cases;
-export const selectCurrentCase = (state: { cases: CasesState }) =>
-  state.cases.currentCase;
-export const selectCasesLoading = (state: { cases: CasesState }) =>
-  state.cases.isLoading;
-export const selectCasesError = (state: { cases: CasesState }) =>
-  state.cases.error;
-export const selectCasesTotal = (state: { cases: CasesState }) =>
-  state.cases.total;
+export const selectCases = (state: any) => state.cases?.cases || [];
+export const selectCurrentCase = (state: any) =>
+  state.cases?.currentCase || null;
+export const selectCasesLoading = (state: any) =>
+  state.cases?.isLoading || false;
+export const selectCasesError = (state: any) =>
+  state.cases?.error || null;
+export const selectCasesTotal = (state: any) =>
+  state.cases?.total || 0;
 
 // Експорт reducer
 export default casesSlice.reducer;

@@ -61,6 +61,11 @@ const saveStateToStorage = (state: AuthState) => {
       refreshToken: state.refreshToken,
     };
     localStorage.setItem('auth', JSON.stringify(stateToSave));
+    
+    // Також зберігаємо токен окремо для сумісності з іншими частинами коду
+    if (state.accessToken) {
+      localStorage.setItem('access_token', state.accessToken);
+    }
   } catch (error) {
     console.error('Failed to save auth state to localStorage:', error);
   }
@@ -74,6 +79,7 @@ const clearStorage = () => {
 
   try {
     localStorage.removeItem('auth');
+    localStorage.removeItem('access_token'); // Також очищаємо окремий токен
   } catch (error) {
     console.error('Failed to clear auth state from localStorage:', error);
   }
@@ -172,12 +178,12 @@ export const {
 } = authSlice.actions;
 
 // Селектори
-export const selectAuth = (state: { auth: AuthState }) => state.auth;
-export const selectUser = (state: { auth: AuthState }) => state.auth.user;
-export const selectIsAuthenticated = (state: { auth: AuthState }) =>
-  state.auth.isAuthenticated;
-export const selectUserRole = (state: { auth: AuthState }) =>
-  state.auth.user?.role;
+export const selectAuth = (state: any) => state.auth || {};
+export const selectUser = (state: any) => state.auth?.user || null;
+export const selectIsAuthenticated = (state: any) =>
+  state.auth?.isAuthenticated || false;
+export const selectUserRole = (state: any) =>
+  state.auth?.user?.role || null;
 
 // Експорт reducer
 export default authSlice.reducer;

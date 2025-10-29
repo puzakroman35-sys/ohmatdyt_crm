@@ -127,6 +127,9 @@ export const deactivateCategoryAsync = createAsyncThunk(
   async (id: string, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('access_token');
+      if (!token) {
+        return rejectWithValue('Не знайдено токен автентифікації. Будь ласка, увійдіть знову.');
+      }
       const response = await axios.post(
         `${API_URL}/api/categories/${id}/deactivate`,
         {},
@@ -134,6 +137,9 @@ export const deactivateCategoryAsync = createAsyncThunk(
       );
       return response.data;
     } catch (error: any) {
+      if (error.response?.status === 401) {
+        return rejectWithValue('Сесія застаріла. Будь ласка, увійдіть знову.');
+      }
       return rejectWithValue(error.response?.data?.detail || 'Помилка при деактивації категорії');
     }
   }
@@ -147,6 +153,9 @@ export const activateCategoryAsync = createAsyncThunk(
   async (id: string, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('access_token');
+      if (!token) {
+        return rejectWithValue('Не знайдено токен автентифікації. Будь ласка, увійдіть знову.');
+      }
       const response = await axios.post(
         `${API_URL}/api/categories/${id}/activate`,
         {},
@@ -154,6 +163,9 @@ export const activateCategoryAsync = createAsyncThunk(
       );
       return response.data;
     } catch (error: any) {
+      if (error.response?.status === 401) {
+        return rejectWithValue('Сесія застаріла. Будь ласка, увійдіть знову.');
+      }
       return rejectWithValue(error.response?.data?.detail || 'Помилка при активації категорії');
     }
   }
@@ -179,8 +191,9 @@ const categoriesSlice = createSlice({
     });
     builder.addCase(fetchCategoriesAsync.fulfilled, (state, action) => {
       state.isLoading = false;
-      state.categories = action.payload.items || action.payload;
-      state.total = action.payload.total || action.payload.length;
+      // API повертає { categories: [...], total: N }
+      state.categories = action.payload.categories || [];
+      state.total = action.payload.total || 0;
     });
     builder.addCase(fetchCategoriesAsync.rejected, (state, action) => {
       state.isLoading = false;
@@ -273,11 +286,11 @@ const categoriesSlice = createSlice({
 });
 
 // Селектори
-export const selectCategories = (state: { categories: CategoriesState }) => state.categories.categories;
-export const selectCategoriesTotal = (state: { categories: CategoriesState }) => state.categories.total;
-export const selectCategoriesLoading = (state: { categories: CategoriesState }) => state.categories.isLoading;
-export const selectCategoriesError = (state: { categories: CategoriesState }) => state.categories.error;
-export const selectCurrentCategory = (state: { categories: CategoriesState }) => state.categories.currentCategory;
+export const selectCategories = (state: any) => state.categories?.categories || [];
+export const selectCategoriesTotal = (state: any) => state.categories?.total || 0;
+export const selectCategoriesLoading = (state: any) => state.categories?.isLoading || false;
+export const selectCategoriesError = (state: any) => state.categories?.error || null;
+export const selectCurrentCategory = (state: any) => state.categories?.currentCategory || null;
 
 export const { clearError, clearCurrentCategory } = categoriesSlice.actions;
 export default categoriesSlice.reducer;

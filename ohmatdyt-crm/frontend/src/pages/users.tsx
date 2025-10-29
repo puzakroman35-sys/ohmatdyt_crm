@@ -405,7 +405,7 @@ const UsersPage: React.FC = () => {
           <Card>
             <Table
               columns={columns}
-              dataSource={users}
+              dataSource={users || []}
               rowKey="id"
               loading={isLoading}
               pagination={{

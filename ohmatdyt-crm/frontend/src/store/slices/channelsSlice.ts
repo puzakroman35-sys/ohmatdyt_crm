@@ -127,6 +127,9 @@ export const deactivateChannelAsync = createAsyncThunk(
   async (id: string, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('access_token');
+      if (!token) {
+        return rejectWithValue('Не знайдено токен автентифікації. Будь ласка, увійдіть знову.');
+      }
       const response = await axios.post(
         `${API_URL}/api/channels/${id}/deactivate`,
         {},
@@ -134,6 +137,9 @@ export const deactivateChannelAsync = createAsyncThunk(
       );
       return response.data;
     } catch (error: any) {
+      if (error.response?.status === 401) {
+        return rejectWithValue('Сесія застаріла. Будь ласка, увійдіть знову.');
+      }
       return rejectWithValue(error.response?.data?.detail || 'Помилка при деактивації каналу');
     }
   }
@@ -147,6 +153,9 @@ export const activateChannelAsync = createAsyncThunk(
   async (id: string, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('access_token');
+      if (!token) {
+        return rejectWithValue('Не знайдено токен автентифікації. Будь ласка, увійдіть знову.');
+      }
       const response = await axios.post(
         `${API_URL}/api/channels/${id}/activate`,
         {},
@@ -154,6 +163,9 @@ export const activateChannelAsync = createAsyncThunk(
       );
       return response.data;
     } catch (error: any) {
+      if (error.response?.status === 401) {
+        return rejectWithValue('Сесія застаріла. Будь ласка, увійдіть знову.');
+      }
       return rejectWithValue(error.response?.data?.detail || 'Помилка при активації каналу');
     }
   }
@@ -179,8 +191,9 @@ const channelsSlice = createSlice({
     });
     builder.addCase(fetchChannelsAsync.fulfilled, (state, action) => {
       state.isLoading = false;
-      state.channels = action.payload.items || action.payload;
-      state.total = action.payload.total || action.payload.length;
+      // API повертає { channels: [...], total: N }
+      state.channels = action.payload.channels || [];
+      state.total = action.payload.total || 0;
     });
     builder.addCase(fetchChannelsAsync.rejected, (state, action) => {
       state.isLoading = false;
@@ -273,11 +286,11 @@ const channelsSlice = createSlice({
 });
 
 // Селектори
-export const selectChannels = (state: { channels: ChannelsState }) => state.channels.channels;
-export const selectChannelsTotal = (state: { channels: ChannelsState }) => state.channels.total;
-export const selectChannelsLoading = (state: { channels: ChannelsState }) => state.channels.isLoading;
-export const selectChannelsError = (state: { channels: ChannelsState }) => state.channels.error;
-export const selectCurrentChannel = (state: { channels: ChannelsState }) => state.channels.currentChannel;
+export const selectChannels = (state: any) => state.channels?.channels || [];
+export const selectChannelsTotal = (state: any) => state.channels?.total || 0;
+export const selectChannelsLoading = (state: any) => state.channels?.isLoading || false;
+export const selectChannelsError = (state: any) => state.channels?.error || null;
+export const selectCurrentChannel = (state: any) => state.channels?.currentChannel || null;
 
 export const { clearError, clearCurrentChannel } = channelsSlice.actions;
 export default channelsSlice.reducer;

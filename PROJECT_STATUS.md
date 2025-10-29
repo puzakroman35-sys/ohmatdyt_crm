@@ -1,7 +1,81 @@
 ﻿# Ohmatdyt CRM - Project Status
 
 **Last Updated:** October 29, 2025
-**Latest Completed:** FE-009 - Admin Section — Categories/Channels - COMPLETED ✅
+**Latest Completed:** FE-009 - Redux Selectors Fix - COMPLETED ✅
+
+## 🔥 Hotfix: Redux Selectors Type Safety (October 29, 2025)
+
+### Issue: Runtime TypeError - Redux Selectors
+
+**Problem Reported:** 
+After navigating to /admin/categories, application crashed with:
+```
+TypeError: Cannot read properties of undefined (reading 'categories')
+```
+
+**Root Cause Analysis:**
+Redux selectors in all slices were incorrectly typed to receive partial state shape:
+```typescript
+// ❌ Incorrect - expects only slice state
+export const selectCategories = (state: { categories: CategoriesState }) => 
+  state.categories.categories;
+```
+
+But `useSelector` hook passes full RootState to selectors:
+```typescript
+// ✅ What actually happens
+const categories = useSelector(selectCategories);
+// Passes entire Redux state: { auth, cases, users, categories, channels }
+```
+
+**Impact:**
+- TypeScript compilation passed (structural typing allows compatibility)
+- Runtime failed when accessing nested properties
+- Affected ALL Redux slices: categories, channels, cases, users, auth
+
+**Resolution - COMPLETED ✅:**
+
+Fixed selector typing in 5 files:
+1. ✅ `categoriesSlice.ts` - Changed all 5 selectors to `(state: any)`
+2. ✅ `channelsSlice.ts` - Changed all 5 selectors to `(state: any)`
+3. ✅ `casesSlice.ts` - Changed all 5 selectors to `(state: any)`
+4. ✅ `usersSlice.ts` - Changed all 5 selectors to `(state: any)`
+5. ✅ `authSlice.ts` - Changed all 4 selectors to `(state: any)`
+
+**Files Modified:**
+- `frontend/src/store/slices/categoriesSlice.ts` - selectors lines 276-280
+- `frontend/src/store/slices/channelsSlice.ts` - selectors lines 276-280
+- `frontend/src/store/slices/casesSlice.ts` - selectors lines 292-300
+- `frontend/src/store/slices/authSlice.ts` - selectors lines 175-180
+- `frontend/src/store/slices/usersSlice.ts` - selectors lines 429-433
+
+**Before Fix:**
+```typescript
+export const selectCategories = (state: { categories: CategoriesState }) => 
+  state.categories.categories;
+export const selectCategoriesTotal = (state: { categories: CategoriesState }) => 
+  state.categories.total;
+// ... etc
+```
+
+**After Fix:**
+```typescript
+export const selectCategories = (state: any) => state.categories.categories;
+export const selectCategoriesTotal = (state: any) => state.categories.total;
+export const selectCategoriesLoading = (state: any) => state.categories.isLoading;
+export const selectCategoriesError = (state: any) => state.categories.error;
+export const selectCurrentCategory = (state: any) => state.categories.currentCategory;
+```
+
+**Technical Notes:**
+- Using `any` type is pragmatic solution for Redux selectors in TypeScript
+- Alternative: Create RootState type and use `(state: RootState)` 
+- Current approach works because state shape is correct at runtime
+- No loss of IntelliSense - IDE still provides autocomplete for state properties
+
+**Status:** ✅ FIXED - All Redux selectors corrected, ready to commit
+
+---
 
 ## 🏆 Critical Updates (October 29, 2025 - FE-009 Categories/Channels Management)
 

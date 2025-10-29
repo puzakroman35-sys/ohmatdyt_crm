@@ -60,14 +60,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           onClick: () => router.push('/users'),
         },
         {
-          key: '/categories',
+          key: '/admin/categories',
           label: 'Категорії',
-          onClick: () => router.push('/categories'),
+          onClick: () => router.push('/admin/categories'),
         },
         {
-          key: '/channels',
+          key: '/admin/channels',
           label: 'Канали звернень',
-          onClick: () => router.push('/channels'),
+          onClick: () => router.push('/admin/channels'),
         },
       ],
     }] : []),

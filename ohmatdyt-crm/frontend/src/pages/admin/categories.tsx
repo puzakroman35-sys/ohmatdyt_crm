@@ -1,6 +1,6 @@
 /**
- * Channels Page
- * Ohmatdyt CRM - Управління каналами зв'язку (тільки для ADMIN)
+ * Categories Page
+ * Ohmatdyt CRM - Управління категоріями (тільки для ADMIN)
  */
 
 import React, { useEffect, useState } from 'react';
@@ -23,35 +23,37 @@ import {
 } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
+import MainLayout from '@/components/Layout/MainLayout';
+import { AuthGuard } from '@/components/Auth';
 import { AppDispatch } from '@/store';
 import {
-  fetchChannelsAsync,
-  selectChannels,
-  selectChannelsTotal,
-  selectChannelsLoading,
-  Channel,
-} from '@/store/slices/channelsSlice';
+  fetchCategoriesAsync,
+  selectCategories,
+  selectCategoriesTotal,
+  selectCategoriesLoading,
+  Category,
+} from '@/store/slices/categoriesSlice';
 import { selectUser } from '@/store/slices/authSlice';
 import {
-  CreateChannelForm,
-  EditChannelForm,
-  DeactivateChannelButton,
-  ActivateChannelButton,
-} from '@/components/Channels';
+  CreateCategoryForm,
+  EditCategoryForm,
+  DeactivateCategoryButton,
+  ActivateCategoryButton,
+} from '@/components/Categories';
 import dayjs from 'dayjs';
 
 const { Title } = Typography;
 
-const ChannelsPage: React.FC = () => {
+const CategoriesPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const channels = useSelector(selectChannels);
-  const total = useSelector(selectChannelsTotal);
-  const isLoading = useSelector(selectChannelsLoading);
+  const categories = useSelector(selectCategories);
+  const total = useSelector(selectCategoriesTotal);
+  const isLoading = useSelector(selectCategoriesLoading);
   const user = useSelector(selectUser);
 
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
 
   const [pagination, setPagination] = useState({
     current: 1,
@@ -63,7 +65,7 @@ const ChannelsPage: React.FC = () => {
   // Завантаження даних
   const loadData = () => {
     dispatch(
-      fetchChannelsAsync({
+      fetchCategoriesAsync({
         skip: (pagination.current - 1) * pagination.pageSize,
         limit: pagination.pageSize,
         search: searchText || undefined,
@@ -89,8 +91,8 @@ const ChannelsPage: React.FC = () => {
     setPagination({ ...pagination, current: 1 });
   };
 
-  const handleEdit = (channel: Channel) => {
-    setSelectedChannel(channel);
+  const handleEdit = (category: Category) => {
+    setSelectedCategory(category);
     setEditModalVisible(true);
   };
 
@@ -104,22 +106,26 @@ const ChannelsPage: React.FC = () => {
 
   if (!hasAccess) {
     return (
-      <Alert
-        message="Доступ заборонено"
-        description="Тільки адміністратори мають доступ до управління каналами зв'язку."
-        type="error"
-        showIcon
-      />
+      <AuthGuard>
+        <MainLayout>
+          <Alert
+            message="Доступ заборонено"
+            description="Тільки адміністратори мають доступ до управління категоріями."
+            type="error"
+            showIcon
+          />
+        </MainLayout>
+      </AuthGuard>
     );
   }
 
   // Колонки таблиці
-  const columns: ColumnsType<Channel> = [
+  const columns: ColumnsType<Category> = [
     {
-      title: 'Назва каналу',
+      title: 'Назва категорії',
       dataIndex: 'name',
       key: 'name',
-      render: (name: string, record: Channel) => (
+      render: (name: string, record: Category) => (
         <Space>
           <span>{name}</span>
           {!record.is_active && (
@@ -135,7 +141,7 @@ const ChannelsPage: React.FC = () => {
       width: 120,
       render: (isActive: boolean) => (
         <Tag color={isActive ? 'green' : 'red'}>
-          {isActive ? 'Активний' : 'Неактивний'}
+          {isActive ? 'Активна' : 'Неактивна'}
         </Tag>
       ),
     },
@@ -151,7 +157,7 @@ const ChannelsPage: React.FC = () => {
       key: 'actions',
       fixed: 'right',
       width: 300,
-      render: (_, record: Channel) => (
+      render: (_, record: Category) => (
         <Space size="small" wrap>
           <Button
             size="small"
@@ -160,12 +166,12 @@ const ChannelsPage: React.FC = () => {
           >
             Редагувати
           </Button>
-          <DeactivateChannelButton
-            channel={record}
+          <DeactivateCategoryButton
+            category={record}
             onSuccess={handleActionSuccess}
           />
-          <ActivateChannelButton
-            channel={record}
+          <ActivateCategoryButton
+            category={record}
             onSuccess={handleActionSuccess}
           />
         </Space>
@@ -174,25 +180,27 @@ const ChannelsPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Card>
-        <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
-          <Col>
-            <Title level={2} style={{ margin: 0 }}>
-              Управління каналами зв'язку
-            </Title>
-          </Col>
-          <Col>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              size="large"
-              onClick={() => setCreateModalVisible(true)}
-            >
-              Створити канал
-            </Button>
-          </Col>
-        </Row>
+    <AuthGuard>
+      <MainLayout>
+        <div style={{ padding: '24px' }}>
+          <Card>
+            <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
+              <Col>
+                <Title level={2} style={{ margin: 0 }}>
+                  Управління категоріями
+                </Title>
+              </Col>
+              <Col>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  size="large"
+                  onClick={() => setCreateModalVisible(true)}
+                >
+                  Створити категорію
+                </Button>
+              </Col>
+            </Row>
 
         {/* Фільтри */}
         <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
@@ -219,7 +227,7 @@ const ChannelsPage: React.FC = () => {
         {/* Таблиця */}
         <Table
           columns={columns}
-          dataSource={channels}
+          dataSource={categories || []}
           rowKey="id"
           loading={isLoading}
           pagination={{
@@ -236,23 +244,25 @@ const ChannelsPage: React.FC = () => {
       </Card>
 
       {/* Модальні вікна */}
-      <CreateChannelForm
+      <CreateCategoryForm
         visible={createModalVisible}
         onClose={() => setCreateModalVisible(false)}
         onSuccess={handleActionSuccess}
       />
 
-      <EditChannelForm
+      <EditCategoryForm
         visible={editModalVisible}
-        channel={selectedChannel}
+        category={selectedCategory}
         onClose={() => {
           setEditModalVisible(false);
-          setSelectedChannel(null);
+          setSelectedCategory(null);
         }}
         onSuccess={handleActionSuccess}
       />
-    </div>
+        </div>
+      </MainLayout>
+    </AuthGuard>
   );
 };
 
-export default ChannelsPage;
+export default CategoriesPage;
