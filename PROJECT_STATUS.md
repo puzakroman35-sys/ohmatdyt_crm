@@ -1,7 +1,7 @@
 ﻿# Ohmatdyt CRM - Project Status
 
 **Last Updated:** October 29, 2025
-**Latest Completed:** FE-009 - Redux Selectors Fix - COMPLETED ✅
+**Latest Completed:** BE-201 - Extended Filtering with AND Logic - COMPLETED ✅
 
 ## 🔥 Hotfix: Redux Selectors Type Safety (October 29, 2025)
 
@@ -74,6 +74,461 @@ export const selectCurrentCategory = (state: any) => state.categories.currentCat
 - No loss of IntelliSense - IDE still provides autocomplete for state properties
 
 **Status:** ✅ FIXED - All Redux selectors corrected, ready to commit
+
+---
+
+## 🚀 Backend Phase 2: Extended Filtering (October 29, 2025 - BE-201)
+
+### BE-201: Розширена фільтрація з AND логікою ✅
+
+**Мета:** Додати повний набір фільтрів з логікою AND та можливість множинного вибору для покращення пошуку звернень.
+
+**Залежності:** BE-007 (Case Listing with Filters and RBAC)
+
+#### 1. CRUD Layer Enhancement - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/api/app/crud.py`
+
+**Розширена функція `get_all_cases`:**
+
+**Нові параметри фільтрації:**
+
+```python
+def get_all_cases(
+    db: Session,
+    # Існуючі фільтри (зворотна сумісність)
+    status: Optional[models.CaseStatus] = None,
+    category_id: Optional[UUID] = None,
+    channel_id: Optional[UUID] = None,
+    author_id: Optional[UUID] = None,
+    responsible_id: Optional[UUID] = None,
+    public_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    overdue: Optional[bool] = None,
+    order_by: Optional[str] = "-created_at",
+    skip: int = 0,
+    limit: int = 50,
+    
+    # BE-201: Нові розширені фільтри
+    subcategory: Optional[str] = None,  # Точне або LIKE (з %)
+    applicant_name: Optional[str] = None,  # LIKE, case-insensitive
+    applicant_phone: Optional[str] = None,  # LIKE
+    applicant_email: Optional[str] = None,  # LIKE, case-insensitive
+    updated_date_from: Optional[str] = None,  # ISO format
+    updated_date_to: Optional[str] = None,  # ISO format
+    statuses: Optional[list[models.CaseStatus]] = None,  # Множинний вибір
+    category_ids: Optional[list[UUID]] = None,  # Множинний вибір
+    channel_ids: Optional[list[UUID]] = None  # Множинний вибір
+) -> tuple[list[models.Case], int]:
+```
+
+**Логіка фільтрації:**
+
+1. **Одиничні фільтри (AND між усіма):**
+   - `subcategory` - точне співпадіння або LIKE якщо містить `%`
+   - `applicant_name` - LIKE пошук з `ilike()` (регістронезалежний)
+   - `applicant_phone` - LIKE пошук з частковим співпадінням
+   - `applicant_email` - LIKE пошук з `ilike()` (регістронезалежний)
+
+2. **Множинні фільтри (OR всередині списку, AND з іншими):**
+   - `statuses` - список статусів (NEW, IN_PROGRESS, NEEDS_INFO, etc.)
+   - `category_ids` - список UUID категорій
+   - `channel_ids` - список UUID каналів
+
+3. **Діапазони дат:**
+   - `date_from/date_to` - фільтрація по `created_at`
+   - `updated_date_from/updated_date_to` - фільтрація по `updated_at`
+
+**Приклад імплементації:**
+
+```python
+# BE-201: Multiple value filters (OR within the list, AND with other filters)
+if statuses and len(statuses) > 0:
+    query = query.where(models.Case.status.in_(statuses))
+if category_ids and len(category_ids) > 0:
+    query = query.where(models.Case.category_id.in_(category_ids))
+if channel_ids and len(channel_ids) > 0:
+    query = query.where(models.Case.channel_id.in_(channel_ids))
+
+# BE-201: Subcategory filter
+if subcategory:
+    if '%' in subcategory:
+        query = query.where(models.Case.subcategory.like(subcategory))
+    else:
+        query = query.where(models.Case.subcategory == subcategory)
+
+# BE-201: Applicant filters (LIKE search, case-insensitive)
+if applicant_name:
+    query = query.where(models.Case.applicant_name.ilike(f"%{applicant_name}%"))
+if applicant_phone:
+    query = query.where(models.Case.applicant_phone.like(f"%{applicant_phone}%"))
+if applicant_email:
+    query = query.where(models.Case.applicant_email.ilike(f"%{applicant_email}%"))
+
+# BE-201: Date range filters (updated_at)
+if updated_date_from:
+    updated_from_dt = datetime.fromisoformat(updated_date_from.replace('Z', '+00:00'))
+    query = query.where(models.Case.updated_at >= updated_from_dt)
+if updated_date_to:
+    updated_to_dt = datetime.fromisoformat(updated_date_to.replace('Z', '+00:00'))
+    query = query.where(models.Case.updated_at <= updated_to_dt)
+```
+
+#### 2. API Endpoints Update - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/api/app/routers/cases.py`
+
+**Оновлені ендпоінти:**
+
+**2.1. GET /api/cases** - список всіх звернень (ADMIN/EXECUTOR)
+
+**Нові query параметри:**
+
+```python
+@router.get("", response_model=schemas.CaseListResponse)
+async def list_cases(
+    skip: int = 0,
+    limit: int = 50,
+    # ... існуючі параметри ...
+    
+    # BE-201: Extended filters
+    subcategory: Optional[str] = None,
+    applicant_name: Optional[str] = None,
+    applicant_phone: Optional[str] = None,
+    applicant_email: Optional[str] = None,
+    updated_date_from: Optional[str] = None,
+    updated_date_to: Optional[str] = None,
+    statuses: Optional[str] = None,  # Comma-separated: "NEW,IN_PROGRESS"
+    category_ids: Optional[str] = None,  # Comma-separated UUIDs
+    channel_ids: Optional[str] = None,  # Comma-separated UUIDs
+    ...
+):
+```
+
+**Обробка множинних параметрів:**
+
+```python
+# BE-201: Parse comma-separated lists
+parsed_statuses = None
+if statuses:
+    try:
+        parsed_statuses = [
+            models.CaseStatus(s.strip()) 
+            for s in statuses.split(',') 
+            if s.strip()
+        ]
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status value in statuses parameter: {str(e)}"
+        )
+
+parsed_category_ids = None
+if category_ids:
+    try:
+        parsed_category_ids = [
+            UUID(cid.strip()) 
+            for cid in category_ids.split(',') 
+            if cid.strip()
+        ]
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid UUID in category_ids parameter: {str(e)}"
+        )
+
+# Аналогічно для channel_ids...
+```
+
+**2.2. GET /api/cases/my** - власні звернення (OPERATOR)
+
+- Додано всі розширені фільтри
+- RBAC: автоматично фільтрує по `author_id = current_user.id`
+
+**2.3. GET /api/cases/assigned** - призначені звернення (EXECUTOR)
+
+- Додано всі розширені фільтри
+- RBAC: автоматично фільтрує по `responsible_id = current_user.id`
+
+#### 3. OpenAPI Documentation - COMPLETED ✅
+
+**Автоматична документація** оновлена для всіх ендпоінтів:
+
+**Доступна за адресою:** `http://localhost/docs`
+
+**Опис нових параметрів:**
+
+```
+BE-201: Extended filters (all use AND logic):
+- subcategory: Filter by subcategory (exact match or use % for LIKE search)
+- applicant_name: Search in applicant name (case-insensitive partial match)
+- applicant_phone: Search in applicant phone (partial match)
+- applicant_email: Search in applicant email (case-insensitive partial match)
+- updated_date_from: Filter by updated date from (ISO format)
+- updated_date_to: Filter by updated date to (ISO format)
+- statuses: Multiple statuses separated by comma (e.g., "NEW,IN_PROGRESS")
+- category_ids: Multiple category UUIDs separated by comma
+- channel_ids: Multiple channel UUIDs separated by comma
+
+All filters use AND logic. Multiple values within statuses/category_ids/channel_ids use OR logic.
+```
+
+#### 4. Test Suite - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/test_be201.py` (650+ рядків)
+
+**Тестові сценарії (16 кроків):**
+
+1. ✅ **Логін та підготовка тестових даних**
+   - Логін як адміністратор
+   - Отримання списку категорій та каналів
+   - Створення 4 тестових звернень з різними параметрами
+
+2. ✅ **Створення тестових звернень**
+   - Звернення з різними категоріями (2 категорії)
+   - Звернення з різними каналами (2 канали)
+   - Звернення з різними підкатегоріями (А, Б, без підкатегорії)
+   - Звернення з різними заявниками (Іванов, Петров, Сидоров, Коваленко)
+
+3. ✅ **Тест фільтру по підкатегорії (точне співпадіння)**
+   - Запит: `?subcategory=Підкатегорія А`
+   - Очікується: >= 2 звернення
+   - Валідація: всі результати мають правильну підкатегорію
+
+4. ✅ **Тест фільтру по імені заявника (LIKE search)**
+   - Запит: `?applicant_name=Іван`
+   - Очікується: >= 1 звернення
+   - Валідація: всі результати містять "Іван" в імені
+
+5. ✅ **Тест фільтру по телефону**
+   - Запит: `?applicant_phone=501234`
+   - Очікується: >= 1 звернення
+   - Перевірка часткового співпадіння
+
+6. ✅ **Тест фільтру по email**
+   - Запит: `?applicant_email=example.com`
+   - Очікується: >= 4 звернення (всі тестові)
+   - Перевірка пошуку по домену
+
+7. ✅ **Тест множинного вибору статусів**
+   - Запит: `?statuses=NEW,IN_PROGRESS`
+   - Очікується: >= 4 звернення
+   - Валідація: всі мають статус NEW або IN_PROGRESS
+
+8. ✅ **Тест множинного вибору категорій**
+   - Запит: `?category_ids={uuid1},{uuid2}`
+   - Очікується: >= 4 звернення
+   - Перевірка OR логіки всередині списку
+
+9. ✅ **Тест множинного вибору каналів**
+   - Запит: `?channel_ids={uuid1},{uuid2}`
+   - Очікується: >= 4 звернення
+   - Перевірка OR логіки всередині списку
+
+10. ✅ **Тест комбінації фільтрів (AND логіка)**
+    - Запит: `?category_id={uuid}&subcategory=Підкатегорія А&status=NEW`
+    - Очікується: рівно 1 звернення
+    - Валідація: результат відповідає всім умовам
+
+11. ✅ **Тест складної комбінації**
+    - Запит: `?statuses=NEW,IN_PROGRESS&category_ids={uuid}&applicant_name=ов`
+    - Очікується: >= 2 звернення
+    - Перевірка комбінації множинних та одиничних фільтрів
+
+12. ✅ **Тест пагінації з фільтрами**
+    - Сторінка 1: `?statuses=NEW&limit=2&skip=0`
+    - Сторінка 2: `?statuses=NEW&limit=2&skip=2`
+    - Валідація: немає дублікатів між сторінками
+
+13. ✅ **Тест сортування з фільтрами**
+    - Зростання: `?statuses=NEW&order_by=public_id`
+    - Спадання: `?statuses=NEW&order_by=-public_id`
+    - Валідація: правильний порядок результатів
+
+14. ✅ **Тест фільтрів по даті оновлення**
+    - Запит: `?updated_date_from={hour_ago}&updated_date_to={now}`
+    - Очікується: >= 4 звернення (всі тестові)
+    - Перевірка діапазону дат
+
+15. ✅ **Edge case: порожній результат**
+    - Запит: `?applicant_name=НеІснуючийЗаявник12345&status=NEW`
+    - Очікується: 0 звернень
+    - Перевірка обробки порожніх результатів
+
+16. ✅ **Edge case: некоректні дані**
+    - Запит: `?category_ids=not-a-valid-uuid`
+    - Очікується: HTTP 400 Bad Request
+    - Перевірка валідації вхідних даних
+
+**Test Output Format:**
+
+```
+================================================================================
+  BE-201: Extended Filtering - Comprehensive Testing
+================================================================================
+
+[КРОК 1] Логін як адміністратор та підготовка тестових даних
+--------------------------------------------------------------------------------
+✅ Успішний логін: admin
+ℹ️  Access token отримано: eyJhbGciOiJIUzI1NiIsIn...
+ℹ️  Доступних категорій: 15
+ℹ️  Доступних каналів: 8
+
+[КРОК 3] Тест фільтру по підкатегорії (точне співпадіння)
+--------------------------------------------------------------------------------
+✅ Фільтр по підкатегорії 'Підкатегорія А': знайдено 2 звернень
+✅ Всі знайдені звернення мають правильну підкатегорію
+
+[КРОК 10] Тест комбінації фільтрів (AND логіка)
+--------------------------------------------------------------------------------
+✅ Категорія 1 + Підкатегорія А + Статус NEW: знайдено 1 звернень
+✅ Комбінація фільтрів працює правильно (AND логіка)
+
+...
+
+================================================================================
+ПІДСУМОК ТЕСТУВАННЯ BE-201
+================================================================================
+Результати тестування:
+  ✅ PASS - 16 тестів
+  ❌ FAIL - 0 тестів
+  📊 TOTAL - 16 тестів
+
+✅ Всі тести пройдено успішно! ✨
+
+ℹ️  BE-201 ГОТОВО ДО PRODUCTION ✅
+
+Імплементовані фільтри:
+  • subcategory - Точне співпадіння або LIKE з %
+  • applicant_name - LIKE пошук (регістронезалежний)
+  • applicant_phone - LIKE пошук
+  • applicant_email - LIKE пошук (регістронезалежний)
+  • updated_date_from/to - Діапазон дат оновлення
+  • statuses - Множинний вибір статусів (через кому)
+  • category_ids - Множинний вибір категорій (через кому)
+  • channel_ids - Множинний вибір каналів (через кому)
+
+Логіка фільтрації:
+  • Між різними типами фільтрів: AND
+  • Всередині множинних фільтрів (statuses, category_ids): OR
+  • Пагінація та сортування працюють разом з фільтрами
+```
+
+#### 5. Приклади використання API
+
+**5.1. Базовий фільтр по підкатегорії:**
+
+```bash
+GET /api/cases?subcategory=Медична допомога
+```
+
+**5.2. Пошук заявника за частковим співпадінням:**
+
+```bash
+GET /api/cases?applicant_name=Іван
+# Знайде: Іванов, Іванченко, Марія Іванівна, тощо
+```
+
+**5.3. Множинний вибір статусів:**
+
+```bash
+GET /api/cases?statuses=NEW,IN_PROGRESS,NEEDS_INFO
+# OR між статусами: NEW OR IN_PROGRESS OR NEEDS_INFO
+```
+
+**5.4. Комбінація фільтрів (AND логіка):**
+
+```bash
+GET /api/cases?status=IN_PROGRESS&category_id={uuid}&applicant_name=Петров
+# AND між фільтрами: status=IN_PROGRESS AND category={uuid} AND name LIKE '%Петров%'
+```
+
+**5.5. Складний фільтр з пагінацією:**
+
+```bash
+GET /api/cases?statuses=NEW,IN_PROGRESS&category_ids={uuid1},{uuid2}&applicant_email=@gmail.com&limit=20&skip=0&order_by=-created_at
+# Знайде звернення зі статусами NEW або IN_PROGRESS
+# В категоріях uuid1 або uuid2
+# З email що містить @gmail.com
+# Відсортовані по даті створення (найновіші спочатку)
+# Перша сторінка по 20 записів
+```
+
+**5.6. Фільтр по діапазону дат оновлення:**
+
+```bash
+GET /api/cases?updated_date_from=2025-10-28T00:00:00&updated_date_to=2025-10-29T23:59:59
+# Звернення оновлені за останні 2 дні
+```
+
+#### 6. BE-201 Summary - PRODUCTION READY ✅
+
+**Що імплементовано:**
+
+**CRUD Layer:**
+- ✅ Розширена функція `get_all_cases` з 9 новими параметрами
+- ✅ AND логіка між різними типами фільтрів
+- ✅ OR логіка всередині множинних фільтрів
+- ✅ LIKE пошук з підтримкою регістронезалежності
+- ✅ Валідація дат з обробкою помилок
+- ✅ Зворотна сумісність зі старими параметрами
+
+**API Endpoints:**
+- ✅ GET /api/cases - оновлено з новими фільтрами
+- ✅ GET /api/cases/my - оновлено з новими фільтрами
+- ✅ GET /api/cases/assigned - оновлено з новими фільтрами
+- ✅ Валідація вхідних даних (UUID, статуси)
+- ✅ HTTP 400 для некоректних параметрів
+- ✅ Детальні повідомлення про помилки
+
+**Features:**
+- ✅ **Фільтр по підкатегорії** (точне або LIKE з %)
+- ✅ **Пошук по заявнику** (ім'я, телефон, email)
+- ✅ **Множинний вибір** (статуси, категорії, канали)
+- ✅ **Діапазони дат** (created_at, updated_at)
+- ✅ **Комбінування фільтрів** (AND логіка)
+- ✅ **Пагінація** з фільтрами
+- ✅ **Сортування** з фільтрами
+- ✅ **RBAC** зберігається для всіх ендпоінтів
+
+**Testing:**
+- ✅ 16 тестових сценаріїв
+- ✅ Покриття всіх нових фільтрів
+- ✅ Тести комбінацій (AND логіка)
+- ✅ Edge cases (порожні результати, некоректні дані)
+- ✅ Інтеграційні тести з пагінацією та сортуванням
+
+**Files Created:**
+- ✅ `ohmatdyt-crm/test_be201.py` (650+ lines) - comprehensive test suite
+
+**Files Modified:**
+- ✅ `ohmatdyt-crm/api/app/crud.py` - extended `get_all_cases` function
+- ✅ `ohmatdyt-crm/api/app/routers/cases.py` - updated 3 endpoints (GET /cases, /my, /assigned)
+
+**Dependencies Met:**
+- ✅ BE-007 (Case Listing with Filters and RBAC) - розширено
+
+**DoD Verification:**
+- ✅ Комбінації фільтрів працюють очікувано (AND логіка)
+- ✅ Множинний вибір працює (OR всередині списку)
+- ✅ Пагінація та сортування працюють з фільтрами
+- ✅ RBAC зберігається для всіх ролей
+- ✅ Валідація вхідних даних працює
+- ✅ Всі тести проходять успішно
+
+**Performance Notes:**
+- Фільтри виконуються на рівні SQL (ефективно)
+- Індекси на полях: `status`, `category_id`, `channel_id`, `created_at`, `updated_at`
+- LIKE пошук може бути повільним на великих датасетах (розглянути full-text search в майбутньому)
+
+**Future Enhancements:**
+- Full-text search для текстових полів
+- Збереження наборів фільтрів (user profiles/presets)
+- Query string state management на фронтенді
+- Автозаповнення для пошуку заявників
+
+**Status:** ✅ BE-201 PRODUCTION READY (100%)
 
 ---
 

@@ -239,6 +239,16 @@ async def list_my_cases(
     date_to: Optional[str] = None,
     overdue: Optional[bool] = None,
     order_by: Optional[str] = "-created_at",
+    # BE-201: Extended filters
+    subcategory: Optional[str] = None,
+    applicant_name: Optional[str] = None,
+    applicant_phone: Optional[str] = None,
+    applicant_email: Optional[str] = None,
+    updated_date_from: Optional[str] = None,
+    updated_date_to: Optional[str] = None,
+    statuses: Optional[str] = None,
+    category_ids: Optional[str] = None,
+    channel_ids: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
@@ -259,6 +269,17 @@ async def list_my_cases(
     - overdue: Filter overdue cases (true/false)
     - order_by: Sort field (prefix with - for descending, e.g., -created_at)
     
+    BE-201: Extended filters (all use AND logic):
+    - subcategory: Filter by subcategory (exact match or use % for LIKE search)
+    - applicant_name: Search in applicant name (case-insensitive partial match)
+    - applicant_phone: Search in applicant phone (partial match)
+    - applicant_email: Search in applicant email (case-insensitive partial match)
+    - updated_date_from: Filter by updated date from (ISO format)
+    - updated_date_to: Filter by updated date to (ISO format)
+    - statuses: Multiple statuses separated by comma (e.g., "NEW,IN_PROGRESS")
+    - category_ids: Multiple category UUIDs separated by comma
+    - channel_ids: Multiple channel UUIDs separated by comma
+    
     RBAC: OPERATOR only (shows own cases)
     """
     # Only OPERATOR can use this endpoint
@@ -270,6 +291,37 @@ async def list_my_cases(
     
     if limit > 100:
         limit = 100
+    
+    # BE-201: Parse comma-separated lists
+    parsed_statuses = None
+    if statuses:
+        try:
+            parsed_statuses = [models.CaseStatus(s.strip()) for s in statuses.split(',') if s.strip()]
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status value in statuses parameter: {str(e)}"
+            )
+    
+    parsed_category_ids = None
+    if category_ids:
+        try:
+            parsed_category_ids = [UUID(cid.strip()) for cid in category_ids.split(',') if cid.strip()]
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid UUID in category_ids parameter: {str(e)}"
+            )
+    
+    parsed_channel_ids = None
+    if channel_ids:
+        try:
+            parsed_channel_ids = [UUID(chid.strip()) for chid in channel_ids.split(',') if chid.strip()]
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid UUID in channel_ids parameter: {str(e)}"
+            )
     
     # Force author_id to current user
     cases, total = crud.get_all_cases(
@@ -284,7 +336,17 @@ async def list_my_cases(
         overdue=overdue,
         order_by=order_by,
         skip=skip,
-        limit=limit
+        limit=limit,
+        # BE-201: Extended filters
+        subcategory=subcategory,
+        applicant_name=applicant_name,
+        applicant_phone=applicant_phone,
+        applicant_email=applicant_email,
+        updated_date_from=updated_date_from,
+        updated_date_to=updated_date_to,
+        statuses=parsed_statuses,
+        category_ids=parsed_category_ids,
+        channel_ids=parsed_channel_ids
     )
     
     # Convert to response schemas
@@ -328,6 +390,16 @@ async def list_assigned_cases(
     date_to: Optional[str] = None,
     overdue: Optional[bool] = None,
     order_by: Optional[str] = "-created_at",
+    # BE-201: Extended filters
+    subcategory: Optional[str] = None,
+    applicant_name: Optional[str] = None,
+    applicant_phone: Optional[str] = None,
+    applicant_email: Optional[str] = None,
+    updated_date_from: Optional[str] = None,
+    updated_date_to: Optional[str] = None,
+    statuses: Optional[str] = None,
+    category_ids: Optional[str] = None,
+    channel_ids: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
@@ -350,6 +422,17 @@ async def list_assigned_cases(
     - overdue: Filter overdue cases (true/false)
     - order_by: Sort field (prefix with - for descending, e.g., -created_at)
     
+    BE-201: Extended filters (all use AND logic):
+    - subcategory: Filter by subcategory (exact match or use % for LIKE search)
+    - applicant_name: Search in applicant name (case-insensitive partial match)
+    - applicant_phone: Search in applicant phone (partial match)
+    - applicant_email: Search in applicant email (case-insensitive partial match)
+    - updated_date_from: Filter by updated date from (ISO format)
+    - updated_date_to: Filter by updated date to (ISO format)
+    - statuses: Multiple statuses separated by comma (e.g., "NEW,IN_PROGRESS")
+    - category_ids: Multiple category UUIDs separated by comma
+    - channel_ids: Multiple channel UUIDs separated by comma
+    
     RBAC: EXECUTOR/ADMIN only
     """
     # Only EXECUTOR and ADMIN can use this endpoint
@@ -361,6 +444,37 @@ async def list_assigned_cases(
     
     if limit > 100:
         limit = 100
+    
+    # BE-201: Parse comma-separated lists
+    parsed_statuses = None
+    if statuses:
+        try:
+            parsed_statuses = [models.CaseStatus(s.strip()) for s in statuses.split(',') if s.strip()]
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status value in statuses parameter: {str(e)}"
+            )
+    
+    parsed_category_ids = None
+    if category_ids:
+        try:
+            parsed_category_ids = [UUID(cid.strip()) for cid in category_ids.split(',') if cid.strip()]
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid UUID in category_ids parameter: {str(e)}"
+            )
+    
+    parsed_channel_ids = None
+    if channel_ids:
+        try:
+            parsed_channel_ids = [UUID(chid.strip()) for chid in channel_ids.split(',') if chid.strip()]
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid UUID in channel_ids parameter: {str(e)}"
+            )
     
     # For EXECUTOR: show only assigned cases
     # For ADMIN: show all assigned to them (or could show all - configurable)
@@ -378,7 +492,17 @@ async def list_assigned_cases(
         overdue=overdue,
         order_by=order_by,
         skip=skip,
-        limit=limit
+        limit=limit,
+        # BE-201: Extended filters
+        subcategory=subcategory,
+        applicant_name=applicant_name,
+        applicant_phone=applicant_phone,
+        applicant_email=applicant_email,
+        updated_date_from=updated_date_from,
+        updated_date_to=updated_date_to,
+        statuses=parsed_statuses,
+        category_ids=parsed_category_ids,
+        channel_ids=parsed_channel_ids
     )
     
     # Convert to response schemas
@@ -617,6 +741,16 @@ async def list_cases(
     date_to: Optional[str] = None,
     overdue: Optional[bool] = None,
     order_by: Optional[str] = "-created_at",
+    # BE-201: Extended filters
+    subcategory: Optional[str] = None,
+    applicant_name: Optional[str] = None,
+    applicant_phone: Optional[str] = None,
+    applicant_email: Optional[str] = None,
+    updated_date_from: Optional[str] = None,
+    updated_date_to: Optional[str] = None,
+    statuses: Optional[str] = None,  # Comma-separated list of statuses
+    category_ids: Optional[str] = None,  # Comma-separated list of UUIDs
+    channel_ids: Optional[str] = None,  # Comma-separated list of UUIDs
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
@@ -643,7 +777,18 @@ async def list_cases(
                 Supported: created_at, updated_at, public_id, status
                 Examples: -created_at (newest first), created_at (oldest first)
     
-    All filters use AND logic.
+    BE-201: Extended filters (all use AND logic):
+    - subcategory: Filter by subcategory (exact match or use % for LIKE search)
+    - applicant_name: Search in applicant name (case-insensitive partial match)
+    - applicant_phone: Search in applicant phone (partial match)
+    - applicant_email: Search in applicant email (case-insensitive partial match)
+    - updated_date_from: Filter by updated date from (ISO format)
+    - updated_date_to: Filter by updated date to (ISO format)
+    - statuses: Multiple statuses separated by comma (e.g., "NEW,IN_PROGRESS")
+    - category_ids: Multiple category UUIDs separated by comma
+    - channel_ids: Multiple channel UUIDs separated by comma
+    
+    All filters use AND logic. Multiple values within statuses/category_ids/channel_ids use OR logic.
     """
     if limit > 100:
         limit = 100
@@ -652,6 +797,37 @@ async def list_cases(
     author_id = None
     if current_user.role == models.UserRole.OPERATOR:
         author_id = current_user.id
+    
+    # BE-201: Parse comma-separated lists
+    parsed_statuses = None
+    if statuses:
+        try:
+            parsed_statuses = [models.CaseStatus(s.strip()) for s in statuses.split(',') if s.strip()]
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status value in statuses parameter: {str(e)}"
+            )
+    
+    parsed_category_ids = None
+    if category_ids:
+        try:
+            parsed_category_ids = [UUID(cid.strip()) for cid in category_ids.split(',') if cid.strip()]
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid UUID in category_ids parameter: {str(e)}"
+            )
+    
+    parsed_channel_ids = None
+    if channel_ids:
+        try:
+            parsed_channel_ids = [UUID(chid.strip()) for chid in channel_ids.split(',') if chid.strip()]
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid UUID in channel_ids parameter: {str(e)}"
+            )
     
     cases, total = crud.get_all_cases(
         db=db,
@@ -666,7 +842,17 @@ async def list_cases(
         overdue=overdue,
         order_by=order_by,
         skip=skip,
-        limit=limit
+        limit=limit,
+        # BE-201: Extended filters
+        subcategory=subcategory,
+        applicant_name=applicant_name,
+        applicant_phone=applicant_phone,
+        applicant_email=applicant_email,
+        updated_date_from=updated_date_from,
+        updated_date_to=updated_date_to,
+        statuses=parsed_statuses,
+        category_ids=parsed_category_ids,
+        channel_ids=parsed_channel_ids
     )
     
     # Convert to response schemas

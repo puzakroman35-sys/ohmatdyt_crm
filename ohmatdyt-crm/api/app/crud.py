@@ -791,16 +791,26 @@ def get_all_cases(
     overdue: Optional[bool] = None,
     order_by: Optional[str] = "-created_at",
     skip: int = 0,
-    limit: int = 50
+    limit: int = 50,
+    # BE-201: Extended filters
+    subcategory: Optional[str] = None,
+    applicant_name: Optional[str] = None,
+    applicant_phone: Optional[str] = None,
+    applicant_email: Optional[str] = None,
+    updated_date_from: Optional[str] = None,
+    updated_date_to: Optional[str] = None,
+    statuses: Optional[list[models.CaseStatus]] = None,
+    category_ids: Optional[list[UUID]] = None,
+    channel_ids: Optional[list[UUID]] = None
 ) -> tuple[list[models.Case], int]:
     """
     Get all cases with optional filtering and sorting.
     
     Args:
         db: Database session
-        status: Filter by case status
-        category_id: Filter by category
-        channel_id: Filter by channel
+        status: Filter by case status (deprecated, use statuses for multiple)
+        category_id: Filter by category (deprecated, use category_ids for multiple)
+        channel_id: Filter by channel (deprecated, use channel_ids for multiple)
         author_id: Filter by author
         responsible_id: Filter by responsible user
         public_id: Filter by 6-digit public ID
@@ -811,6 +821,17 @@ def get_all_cases(
         skip: Number of records to skip (pagination)
         limit: Maximum number of records to return
         
+        # BE-201: Extended filters (all use AND logic)
+        subcategory: Filter by subcategory (exact match or LIKE if contains %)
+        applicant_name: Filter by applicant name (LIKE search, case-insensitive)
+        applicant_phone: Filter by applicant phone (LIKE search)
+        applicant_email: Filter by applicant email (LIKE search, case-insensitive)
+        updated_date_from: Filter by updated date from (ISO format)
+        updated_date_to: Filter by updated date to (ISO format)
+        statuses: Filter by multiple statuses (OR within, AND with others)
+        category_ids: Filter by multiple categories (OR within, AND with others)
+        channel_ids: Filter by multiple channels (OR within, AND with others)
+        
     Returns:
         Tuple of (list of cases, total count)
     """
@@ -819,6 +840,7 @@ def get_all_cases(
     query = select(models.Case)
     
     # Apply filters (AND logic)
+    # Single value filters (backward compatibility)
     if status:
         query = query.where(models.Case.status == status)
     if category_id:
@@ -832,7 +854,32 @@ def get_all_cases(
     if public_id:
         query = query.where(models.Case.public_id == public_id)
     
-    # Date range filters
+    # BE-201: Multiple value filters (OR within the list, AND with other filters)
+    if statuses and len(statuses) > 0:
+        query = query.where(models.Case.status.in_(statuses))
+    if category_ids and len(category_ids) > 0:
+        query = query.where(models.Case.category_id.in_(category_ids))
+    if channel_ids and len(channel_ids) > 0:
+        query = query.where(models.Case.channel_id.in_(channel_ids))
+    
+    # BE-201: Subcategory filter
+    if subcategory:
+        if '%' in subcategory:
+            # LIKE search if contains wildcard
+            query = query.where(models.Case.subcategory.like(subcategory))
+        else:
+            # Exact match
+            query = query.where(models.Case.subcategory == subcategory)
+    
+    # BE-201: Applicant filters (LIKE search, case-insensitive)
+    if applicant_name:
+        query = query.where(models.Case.applicant_name.ilike(f"%{applicant_name}%"))
+    if applicant_phone:
+        query = query.where(models.Case.applicant_phone.like(f"%{applicant_phone}%"))
+    if applicant_email:
+        query = query.where(models.Case.applicant_email.ilike(f"%{applicant_email}%"))
+    
+    # Date range filters (created_at)
     if date_from:
         try:
             date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
@@ -844,6 +891,21 @@ def get_all_cases(
         try:
             date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
             query = query.where(models.Case.created_at <= date_to_dt)
+        except ValueError:
+            pass  # Invalid date format, skip filter
+    
+    # BE-201: Date range filters (updated_at)
+    if updated_date_from:
+        try:
+            updated_from_dt = datetime.fromisoformat(updated_date_from.replace('Z', '+00:00'))
+            query = query.where(models.Case.updated_at >= updated_from_dt)
+        except ValueError:
+            pass  # Invalid date format, skip filter
+    
+    if updated_date_to:
+        try:
+            updated_to_dt = datetime.fromisoformat(updated_date_to.replace('Z', '+00:00'))
+            query = query.where(models.Case.updated_at <= updated_to_dt)
         except ValueError:
             pass  # Invalid date format, skip filter
     
