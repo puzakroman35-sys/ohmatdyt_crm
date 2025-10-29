@@ -8,7 +8,6 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { Row, Col, Typography, Spin, message } from 'antd';
-import MainLayout from '@/components/Layout/MainLayout';
 import { AuthGuard } from '@/components/Auth';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectUser } from '@/store/slices/authSlice';
@@ -139,64 +138,62 @@ const DashboardPage: React.FC = () => {
 
   return (
     <AuthGuard>
-      <MainLayout>
-        <Title level={2} style={{ marginBottom: 24 }}>
-          📊 Дашборд адміністратора
-        </Title>
+      <Title level={2} style={{ marginBottom: 24 }}>
+        📊 Дашборд адміністратора
+      </Title>
 
-        {/* Фільтр періоду */}
-        <DateRangeFilter
-          value={dateRange}
-          onChange={(newRange) => dispatch(setDateRange(newRange))}
-          onApply={handleDateRangeApply}
-        />
+      {/* Фільтр періоду */}
+      <DateRangeFilter
+        value={dateRange}
+        onChange={(newRange) => dispatch(setDateRange(newRange))}
+        onApply={handleDateRangeApply}
+      />
 
-        {/* Загальна статистика */}
-        <StatsSummary
-          data={summary}
-          loading={summaryLoading}
-          error={summaryError}
-        />
+      {/* Загальна статистика */}
+      <StatsSummary
+        data={summary}
+        loading={summaryLoading}
+        error={summaryError}
+      />
 
-        {/* Графіки та аналітика */}
-        <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
-          {/* Розподіл по статусах */}
-          <Col xs={24} lg={12}>
-            <StatusDistributionChart
-              data={statusDistribution}
-              loading={statusDistributionLoading}
-              error={statusDistributionError}
-            />
-          </Col>
-
-          {/* ТОП категорій */}
-          <Col xs={24} lg={12}>
-            <TopCategoriesChart
-              data={categoriesTop}
-              loading={categoriesTopLoading}
-              error={categoriesTopError}
-            />
-          </Col>
-        </Row>
-
-        {/* Прострочені звернення */}
-        <div style={{ marginTop: 24 }}>
-          <OverdueCasesList
-            data={overdueCases}
-            loading={overdueCasesLoading}
-            error={overdueCasesError}
+      {/* Графіки та аналітика */}
+      <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+        {/* Розподіл по статусах */}
+        <Col xs={24} lg={12}>
+          <StatusDistributionChart
+            data={statusDistribution}
+            loading={statusDistributionLoading}
+            error={statusDistributionError}
           />
-        </div>
+        </Col>
 
-        {/* Ефективність виконавців */}
-        <div style={{ marginTop: 24 }}>
-          <ExecutorsEfficiencyTable
-            data={executorEfficiency}
-            loading={executorEfficiencyLoading}
-            error={executorEfficiencyError}
+        {/* ТОП категорій */}
+        <Col xs={24} lg={12}>
+          <TopCategoriesChart
+            data={categoriesTop}
+            loading={categoriesTopLoading}
+            error={categoriesTopError}
           />
-        </div>
-      </MainLayout>
+        </Col>
+      </Row>
+
+      {/* Прострочені звернення */}
+      <div style={{ marginTop: 24 }}>
+        <OverdueCasesList
+          data={overdueCases}
+          loading={overdueCasesLoading}
+          error={overdueCasesError}
+        />
+      </div>
+
+      {/* Ефективність виконавців */}
+      <div style={{ marginTop: 24 }}>
+        <ExecutorsEfficiencyTable
+          data={executorEfficiency}
+          loading={executorEfficiencyLoading}
+          error={executorEfficiencyError}
+        />
+      </div>
     </AuthGuard>
   );
 };

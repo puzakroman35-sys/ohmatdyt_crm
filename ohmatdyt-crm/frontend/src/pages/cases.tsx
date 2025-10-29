@@ -29,7 +29,6 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useRouter } from 'next/router';
 import dayjs from 'dayjs';
-import MainLayout from '@/components/Layout/MainLayout';
 import { AuthGuard } from '@/components/Auth';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -341,20 +340,19 @@ const CasesPage: React.FC = () => {
 
   return (
     <AuthGuard>
-      <MainLayout>
-        <div style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <Title level={2} style={{ margin: 0 }}>
-              Звернення
-            </Title>
-            <Button
-              type="primary"
-              size="large"
-              onClick={() => router.push('/cases/create')}
-            >
-              + Створити звернення
-            </Button>
-          </div>
+      <div style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <Title level={2} style={{ margin: 0 }}>
+            Звернення
+          </Title>
+          <Button
+            type="primary"
+            size="large"
+            onClick={() => router.push('/cases/create')}
+          >
+            + Створити звернення
+          </Button>
+        </div>
 
         {/* Фільтри */}
         <Card style={{ marginBottom: 24 }}>
@@ -488,7 +486,6 @@ const CasesPage: React.FC = () => {
           background-color: #ffe7e6 !important;
         }
       `}</style>
-      </MainLayout>
     </AuthGuard>
   );
 };

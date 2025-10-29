@@ -27,7 +27,6 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import MainLayout from '@/components/Layout/MainLayout';
 import { AuthGuard } from '@/components/Auth';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -301,19 +300,16 @@ const UsersPage: React.FC = () => {
   if (!hasAccess) {
     return (
       <AuthGuard>
-        <MainLayout>
-          <div style={{ padding: '24px', textAlign: 'center' }}>
-            <Title level={3}>Доступ заборонено</Title>
-            <p>Тільки адміністратори мають доступ до цієї сторінки</p>
-          </div>
-        </MainLayout>
+        <div style={{ padding: '24px', textAlign: 'center' }}>
+          <Title level={3}>Доступ заборонено</Title>
+          <p>Тільки адміністратори мають доступ до цієї сторінки</p>
+        </div>
       </AuthGuard>
     );
   }
 
   return (
     <AuthGuard>
-      <MainLayout>
         <div style={{ padding: '24px' }}>
           {/* Заголовок та кнопка створення */}
           <div
@@ -426,16 +422,15 @@ const UsersPage: React.FC = () => {
           onSuccess={handleCreateSuccess}
         />
 
-        <EditUserForm
-          visible={isEditModalVisible}
-          user={editingUser}
-          onCancel={() => {
-            setIsEditModalVisible(false);
-            setEditingUser(null);
-          }}
-          onSuccess={handleEditSuccess}
-        />
-      </MainLayout>
+      <EditUserForm
+        visible={isEditModalVisible}
+        user={editingUser}
+        onCancel={() => {
+          setIsEditModalVisible(false);
+          setEditingUser(null);
+        }}
+        onSuccess={handleEditSuccess}
+      />
     </AuthGuard>
   );
 };

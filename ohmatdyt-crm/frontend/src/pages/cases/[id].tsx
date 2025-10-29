@@ -31,7 +31,6 @@ import {
   FileTextOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import MainLayout from '@/components/Layout/MainLayout';
 import { AuthGuard } from '@/components/Auth';
 import { useAppSelector } from '@/store/hooks';
 import { selectUser } from '@/store/slices/authSlice';
@@ -196,12 +195,10 @@ const CaseDetailPage: React.FC = () => {
   if (loading) {
     return (
       <AuthGuard>
-        <MainLayout>
-          <div style={{ textAlign: 'center', padding: '100px 0' }}>
-            <Spin size="large" />
-            <div style={{ marginTop: 16 }}>Завантаження...</div>
-          </div>
-        </MainLayout>
+        <div style={{ textAlign: 'center', padding: '100px 0' }}>
+          <Spin size="large" />
+          <div style={{ marginTop: 16 }}>Завантаження...</div>
+        </div>
       </AuthGuard>
     );
   }
@@ -209,31 +206,28 @@ const CaseDetailPage: React.FC = () => {
   if (error || !caseDetail) {
     return (
       <AuthGuard>
-        <MainLayout>
-          <div style={{ padding: '24px' }}>
-            <Alert
-              message="Помилка"
-              description={error || 'Звернення не знайдено'}
-              type="error"
-              showIcon
-            />
-            <Button
-              type="primary"
-              icon={<ArrowLeftOutlined />}
-              onClick={() => router.push('/cases')}
-              style={{ marginTop: 16 }}
-            >
-              Повернутись до списку
-            </Button>
-          </div>
-        </MainLayout>
+        <div style={{ padding: '24px' }}>
+          <Alert
+            message="Помилка"
+            description={error || 'Звернення не знайдено'}
+            type="error"
+            showIcon
+          />
+          <Button
+            type="primary"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => router.push('/cases')}
+            style={{ marginTop: 16 }}
+          >
+            Повернутись до списку
+          </Button>
+        </div>
       </AuthGuard>
     );
   }
 
   return (
     <AuthGuard>
-      <MainLayout>
         <div style={{ padding: '24px' }}>
           {/* Header */}
           <div style={{ marginBottom: 24 }}>
@@ -503,7 +497,6 @@ const CaseDetailPage: React.FC = () => {
             </Col>
           </Row>
         </div>
-      </MainLayout>
     </AuthGuard>
   );
 };

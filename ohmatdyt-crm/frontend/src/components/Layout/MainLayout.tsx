@@ -17,6 +17,7 @@ import {
   BellOutlined,
 } from '@ant-design/icons';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectUser, logout } from '@/store/slices/authSlice';
 
@@ -39,14 +40,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     ...(user?.role === 'ADMIN' ? [{
       key: '/dashboard',
       icon: <DashboardOutlined />,
-      label: 'Головна',
-      onClick: () => router.push('/dashboard'),
+      label: <Link href="/dashboard">Головна</Link>,
     }] : []),
     {
       key: '/cases',
       icon: <FileTextOutlined />,
-      label: 'Звернення',
-      onClick: () => router.push('/cases'),
+      label: <Link href="/cases">Звернення</Link>,
     },
     // Адміністрування тільки для ADMIN
     ...(user?.role === 'ADMIN' ? [{
@@ -56,18 +55,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       children: [
         {
           key: '/users',
-          label: 'Користувачі',
-          onClick: () => router.push('/users'),
+          label: <Link href="/users">Користувачі</Link>,
         },
         {
           key: '/admin/categories',
-          label: 'Категорії',
-          onClick: () => router.push('/admin/categories'),
+          label: <Link href="/admin/categories">Категорії</Link>,
         },
         {
           key: '/admin/channels',
-          label: 'Канали звернень',
-          onClick: () => router.push('/admin/channels'),
+          label: <Link href="/admin/channels">Канали звернень</Link>,
         },
       ],
     }] : []),

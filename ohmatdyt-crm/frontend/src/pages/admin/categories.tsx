@@ -23,7 +23,6 @@ import {
 } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
-import MainLayout from '@/components/Layout/MainLayout';
 import { AuthGuard } from '@/components/Auth';
 import { AppDispatch } from '@/store';
 import {
@@ -107,14 +106,12 @@ const CategoriesPage: React.FC = () => {
   if (!hasAccess) {
     return (
       <AuthGuard>
-        <MainLayout>
-          <Alert
-            message="Доступ заборонено"
-            description="Тільки адміністратори мають доступ до управління категоріями."
-            type="error"
-            showIcon
-          />
-        </MainLayout>
+        <Alert
+          message="Доступ заборонено"
+          description="Тільки адміністратори мають доступ до управління категоріями."
+          type="error"
+          showIcon
+        />
       </AuthGuard>
     );
   }
@@ -181,9 +178,8 @@ const CategoriesPage: React.FC = () => {
 
   return (
     <AuthGuard>
-      <MainLayout>
-        <div style={{ padding: '24px' }}>
-          <Card>
+      <div style={{ padding: '24px' }}>
+        <Card>
             <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
               <Col>
                 <Title level={2} style={{ margin: 0 }}>
@@ -259,8 +255,7 @@ const CategoriesPage: React.FC = () => {
         }}
         onSuccess={handleActionSuccess}
       />
-        </div>
-      </MainLayout>
+      </div>
     </AuthGuard>
   );
 };
