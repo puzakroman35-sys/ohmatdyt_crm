@@ -1,5 +1,6 @@
 """CRUD operations for database models."""
 
+import logging
 from typing import Optional
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
@@ -7,6 +8,9 @@ from sqlalchemy import select
 
 from app import models, schemas
 from app.auth import hash_password
+
+# Налаштування логування
+logger = logging.getLogger(__name__)
 
 
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
@@ -108,6 +112,7 @@ def get_users(
     limit: int = 100,
     role: Optional[models.UserRole] = None,
     is_active: Optional[bool] = None,
+    search: Optional[str] = None,
     order_by: Optional[str] = "username"
 ) -> tuple[list[models.User], int]:
     """
@@ -119,11 +124,14 @@ def get_users(
         limit: Maximum number of records to return
         role: Filter by user role
         is_active: Filter by active status
+        search: Search by username, email, or full_name (case-insensitive)
         order_by: Sort field (prefix with - for descending, e.g., -created_at)
         
     Returns:
         Tuple of (list of users, total count)
     """
+    from sqlalchemy import or_
+    
     query = select(models.User)
     
     if role is not None:
@@ -131,6 +139,15 @@ def get_users(
     
     if is_active is not None:
         query = query.where(models.User.is_active == is_active)
+    
+    # Пошук за логіном, email або ПІБ (case-insensitive)
+    if search:
+        search_filter = or_(
+            models.User.username.ilike(f"%{search}%"),
+            models.User.email.ilike(f"%{search}%"),
+            models.User.full_name.ilike(f"%{search}%")
+        )
+        query = query.where(search_filter)
     
     # Get total count
     from sqlalchemy import func

@@ -203,11 +203,14 @@ async def list_users(
     limit: int = 100,
     role: Optional[models.UserRole] = None,
     is_active: Optional[bool] = None,
+    search: Optional[str] = None,
+    order_by: Optional[str] = "username",
+    order: Optional[str] = "asc",
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_admin)
 ):
     """
-    List users with filtering and pagination.
+    List users with filtering, search, and pagination.
     
     Requires: Admin privileges
     
@@ -216,12 +219,25 @@ async def list_users(
     - limit: Maximum number of records to return (default: 100, max: 100)
     - role: Filter by role (OPERATOR, EXECUTOR, ADMIN)
     - is_active: Filter by active status
+    - search: Search by username, email, or full_name (case-insensitive)
+    - order_by: Field to sort by (default: username)
+    - order: Sort order (asc/desc, default: asc)
     """
     if limit > 100:
         limit = 100
     
-    db_users = crud.get_users(db, skip=skip, limit=limit, role=role, is_active=is_active)
-    total = len(db_users)  # TODO: Add proper count query
+    # Формуємо order_by з префіксом для descending
+    order_by_param = f"-{order_by}" if order == "desc" else order_by
+    
+    db_users, total = crud.get_users(
+        db, 
+        skip=skip, 
+        limit=limit, 
+        role=role, 
+        is_active=is_active,
+        search=search,
+        order_by=order_by_param
+    )
     
     # Convert User models to UserResponse schemas
     users = [

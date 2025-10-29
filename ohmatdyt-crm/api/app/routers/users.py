@@ -20,7 +20,9 @@ async def list_users(
     limit: int = Query(50, ge=1, le=100, description="Maximum number of records to return"),
     role: Optional[models.UserRole] = Query(None, description="Filter by role"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
-    order_by: Optional[str] = Query("username", description="Sort field (prefix with - for descending)"),
+    search: Optional[str] = Query(None, description="Search by username, email, or full_name"),
+    order_by: Optional[str] = Query("username", description="Sort field"),
+    order: Optional[str] = Query("asc", description="Sort order (asc/desc)"),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_admin)
 ):
@@ -32,7 +34,9 @@ async def list_users(
     - limit: Максимальна кількість записів (1-100)
     - role: Фільтр за роллю (OPERATOR, EXECUTOR, ADMIN)
     - is_active: Фільтр за статусом активності
-    - order_by: Поле сортування (username, created_at, -username, -created_at)
+    - search: Пошук за логіном, email або ПІБ (case-insensitive)
+    - order_by: Поле сортування (username, created_at, email, full_name)
+    - order: Порядок сортування (asc, desc)
     
     **Response:**
     - users: Список користувачів
@@ -44,13 +48,17 @@ async def list_users(
     - 401: Не авторизований
     - 403: Недостатньо прав (потрібен ADMIN)
     """
+    # Формуємо order_by з префіксом для descending
+    order_by_param = f"-{order_by}" if order == "desc" else order_by
+    
     users, total = crud.get_users(
         db=db,
         skip=skip,
         limit=limit,
         role=role,
         is_active=is_active,
-        order_by=order_by
+        search=search,
+        order_by=order_by_param
     )
     
     user_responses = [
