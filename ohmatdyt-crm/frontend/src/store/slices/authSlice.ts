@@ -27,17 +27,26 @@ export interface AuthState {
 // Завантаження стану з localStorage
 const loadStateFromStorage = (): Partial<AuthState> => {
   if (typeof window === 'undefined') {
-    return {};
+    return {
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      isAuthenticated: false,
+    };
   }
 
   try {
     const savedState = localStorage.getItem('auth');
     if (savedState) {
       const parsed = JSON.parse(savedState);
+      // Також відновлюємо окремий токен для сумісності
+      if (parsed.accessToken) {
+        localStorage.setItem('access_token', parsed.accessToken);
+      }
       return {
-        user: parsed.user,
-        accessToken: parsed.accessToken,
-        refreshToken: parsed.refreshToken,
+        user: parsed.user || null,
+        accessToken: parsed.accessToken || null,
+        refreshToken: parsed.refreshToken || null,
         isAuthenticated: !!parsed.accessToken,
       };
     }
@@ -45,7 +54,12 @@ const loadStateFromStorage = (): Partial<AuthState> => {
     console.error('Failed to load auth state from localStorage:', error);
   }
 
-  return {};
+  return {
+    user: null,
+    accessToken: null,
+    refreshToken: null,
+    isAuthenticated: false,
+  };
 };
 
 // Збереження стану в localStorage
@@ -86,11 +100,12 @@ const clearStorage = () => {
 };
 
 // Початковий стан
+const loadedState = loadStateFromStorage();
 const initialState: AuthState = {
-  user: null,
-  accessToken: null,
-  refreshToken: null,
-  isAuthenticated: false,
+  user: loadedState.user || null,
+  accessToken: loadedState.accessToken || null,
+  refreshToken: loadedState.refreshToken || null,
+  isAuthenticated: loadedState.isAuthenticated || false,
   isLoading: false,
   error: null,
 };
