@@ -203,7 +203,7 @@ async def test_download_attachment(token: str, attachment_id: str):
         headers = {"Authorization": f"Bearer {token}"}
         
         response = await client.get(
-            f"{API_BASE_URL}/api/attachments/{attachment_id}",
+            f"{API_BASE_URL}/api/attachments/{attachment_id}/download",
             headers=headers
         )
         

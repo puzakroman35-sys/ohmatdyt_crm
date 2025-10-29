@@ -120,7 +120,7 @@ try {
 if ($attachmentId) {
     Write-Host "`n8. Downloading attachment..." -ForegroundColor Yellow
     try {
-        $downloadUrl = "$API_URL/api/attachments/$attachmentId"
+        $downloadUrl = "$API_URL/api/attachments/$attachmentId/download"
         $downloadFile = [System.IO.Path]::GetTempFileName() -replace '\.tmp$', '_downloaded.pdf'
         
         Invoke-WebRequest -Uri $downloadUrl -Headers $headers -OutFile $downloadFile

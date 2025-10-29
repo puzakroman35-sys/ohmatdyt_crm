@@ -187,7 +187,7 @@ async def list_case_attachments(
     }
 
 
-@router.get("/{attachment_id}")
+@router.get("/{attachment_id}/download")
 async def download_attachment(
     attachment_id: UUID,
     db: Session = Depends(get_db),

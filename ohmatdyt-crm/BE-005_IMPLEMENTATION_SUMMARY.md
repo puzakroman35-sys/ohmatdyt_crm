@@ -79,7 +79,7 @@ October 28, 2025
   - OPERATOR: Can view attachments for own cases
   - EXECUTOR/ADMIN: Can view all attachments
 
-#### GET `/api/attachments/{attachment_id}`
+#### GET `/api/attachments/{attachment_id}/download`
 - Download attachment file
 - Returns file with original name
 - Serves correct MIME type
@@ -273,7 +273,7 @@ curl -X GET \
 ### Download Attachment
 ```bash
 curl -X GET \
-  http://localhost:8001/api/attachments/{attachment_id} \
+  http://localhost:8001/api/attachments/{attachment_id}/download \
   -H "Authorization: Bearer {token}" \
   -o downloaded_file.pdf
 ```
