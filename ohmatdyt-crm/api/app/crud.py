@@ -1990,7 +1990,7 @@ def get_dashboard_summary(
     
     Args:
         db: Database session
-        date_from: Початок періоду (ISO format)
+        date_from: Початок períоду (ISO format)
         date_to: Кінець періоду (ISO format)
         
     Returns:
@@ -1999,30 +1999,35 @@ def get_dashboard_summary(
     from sqlalchemy import func
     from datetime import datetime
     
-    # Базовий запит
-    query = select(models.Case)
+    # Базовий запит для фільтрації
+    base_filter = []
     
     # Фільтрація по даті створення
     if date_from:
         date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
-        query = query.where(models.Case.created_at >= date_from_dt)
+        base_filter.append(models.Case.created_at >= date_from_dt)
     
     if date_to:
         date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
-        query = query.where(models.Case.created_at <= date_to_dt)
+        base_filter.append(models.Case.created_at <= date_to_dt)
     
-    # Отримуємо загальну кількість
-    total_cases = db.execute(
-        select(func.count(models.Case.id)).select_from(query.subquery())
-    ).scalar() or 0
+    # Отримуємо загальну кількість звернень
+    total_query = select(func.count(models.Case.id))
+    if base_filter:
+        total_query = total_query.where(*base_filter)
     
-    # Рахуємо по статусах
+    total_cases = db.execute(total_query).scalar() or 0
+    
+    # Рахуємо по кожному статусу
     status_counts = {}
     for status in models.CaseStatus:
-        count_query = query.where(models.Case.status == status)
-        count = db.execute(
-            select(func.count(models.Case.id)).select_from(count_query.subquery())
-        ).scalar() or 0
+        status_query = select(func.count(models.Case.id)).where(
+            models.Case.status == status
+        )
+        if base_filter:
+            status_query = status_query.where(*base_filter)
+        
+        count = db.execute(status_query).scalar() or 0
         status_counts[status.value] = count
     
     return {
@@ -2056,31 +2061,35 @@ def get_status_distribution(
     from sqlalchemy import func
     from datetime import datetime
     
-    # Базовий запит
-    query = select(models.Case)
+    # Базовий фільтр для дат
+    base_filter = []
     
     # Фільтрація по даті
     if date_from:
         date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
-        query = query.where(models.Case.created_at >= date_from_dt)
+        base_filter.append(models.Case.created_at >= date_from_dt)
     
     if date_to:
         date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
-        query = query.where(models.Case.created_at <= date_to_dt)
+        base_filter.append(models.Case.created_at <= date_to_dt)
     
-    # Загальна кількість
-    total_cases = db.execute(
-        select(func.count(models.Case.id)).select_from(query.subquery())
-    ).scalar() or 0
+    # Загальна кількість звернень
+    total_query = select(func.count(models.Case.id))
+    if base_filter:
+        total_query = total_query.where(*base_filter)
+    
+    total_cases = db.execute(total_query).scalar() or 0
     
     # Розподіл по статусах
     distribution = []
     for status in models.CaseStatus:
-        count_query = query.where(models.Case.status == status)
-        count = db.execute(
-            select(func.count(models.Case.id)).select_from(count_query.subquery())
-        ).scalar() or 0
+        status_query = select(func.count(models.Case.id)).where(
+            models.Case.status == status
+        )
+        if base_filter:
+            status_query = status_query.where(*base_filter)
         
+        count = db.execute(status_query).scalar() or 0
         percentage = (count / total_cases * 100) if total_cases > 0 else 0.0
         
         distribution.append({
@@ -2290,34 +2299,33 @@ def get_top_categories(
     from sqlalchemy import func
     from datetime import datetime
     
-    # Базовий запит
-    query = select(models.Case)
+    # Базовий фільтр для дат
+    base_filter = []
     
     # Фільтрація по даті
     if date_from:
         date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
-        query = query.where(models.Case.created_at >= date_from_dt)
+        base_filter.append(models.Case.created_at >= date_from_dt)
     
     if date_to:
         date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
-        query = query.where(models.Case.created_at <= date_to_dt)
+        base_filter.append(models.Case.created_at <= date_to_dt)
     
     # Загальна кількість звернень
-    total_cases_all = db.execute(
-        select(func.count(models.Case.id)).select_from(query.subquery())
-    ).scalar() or 0
+    total_query = select(func.count(models.Case.id))
+    if base_filter:
+        total_query = total_query.where(*base_filter)
+    
+    total_cases_all = db.execute(total_query).scalar() or 0
     
     # Групуємо по категоріях та рахуємо
-    category_stats_query = (
-        select(
-            models.Case.category_id,
-            func.count(models.Case.id).label('total_count')
-        )
-        .select_from(query.subquery())
-        .group_by(models.Case.category_id)
-        .order_by(func.count(models.Case.id).desc())
-        .limit(limit)
-    )
+    category_stats_query = select(
+        models.Case.category_id,
+        func.count(models.Case.id).label('total_count')
+    ).group_by(models.Case.category_id).order_by(func.count(models.Case.id).desc()).limit(limit)
+    
+    if base_filter:
+        category_stats_query = category_stats_query.where(*base_filter)
     
     category_stats = db.execute(category_stats_query).all()
     
@@ -2333,22 +2341,32 @@ def get_top_categories(
             continue
         
         # Рахуємо по статусах для цієї категорії
-        category_query = query.where(models.Case.category_id == category_id)
+        # NEW
+        new_query = select(func.count(models.Case.id)).where(
+            models.Case.category_id == category_id,
+            models.Case.status == models.CaseStatus.NEW
+        )
+        if base_filter:
+            new_query = new_query.where(*base_filter)
+        new_count = db.execute(new_query).scalar() or 0
         
-        new_count = db.execute(
-            select(func.count(models.Case.id))
-            .select_from(category_query.where(models.Case.status == models.CaseStatus.NEW).subquery())
-        ).scalar() or 0
+        # IN_PROGRESS
+        in_progress_query = select(func.count(models.Case.id)).where(
+            models.Case.category_id == category_id,
+            models.Case.status == models.CaseStatus.IN_PROGRESS
+        )
+        if base_filter:
+            in_progress_query = in_progress_query.where(*base_filter)
+        in_progress_count = db.execute(in_progress_query).scalar() or 0
         
-        in_progress_count = db.execute(
-            select(func.count(models.Case.id))
-            .select_from(category_query.where(models.Case.status == models.CaseStatus.IN_PROGRESS).subquery())
-        ).scalar() or 0
-        
-        completed_count = db.execute(
-            select(func.count(models.Case.id))
-            .select_from(category_query.where(models.Case.status == models.CaseStatus.DONE).subquery())
-        ).scalar() or 0
+        # DONE
+        completed_query = select(func.count(models.Case.id)).where(
+            models.Case.category_id == category_id,
+            models.Case.status == models.CaseStatus.DONE
+        )
+        if base_filter:
+            completed_query = completed_query.where(*base_filter)
+        completed_count = db.execute(completed_query).scalar() or 0
         
         percentage = (total_count / total_cases_all * 100) if total_cases_all > 0 else 0.0
         
