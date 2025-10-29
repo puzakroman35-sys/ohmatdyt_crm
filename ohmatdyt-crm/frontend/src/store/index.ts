@@ -9,6 +9,7 @@ import casesReducer from './slices/casesSlice';
 import usersReducer from './slices/usersSlice';
 import categoriesReducer from './slices/categoriesSlice';
 import channelsReducer from './slices/channelsSlice';
+import dashboardReducer from './slices/dashboardSlice'; // FE-301
 
 export const store = configureStore({
   reducer: {
@@ -17,6 +18,7 @@ export const store = configureStore({
     users: usersReducer,
     categories: categoriesReducer,
     channels: channelsReducer,
+    dashboard: dashboardReducer, // FE-301
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
