@@ -484,3 +484,109 @@ class ActiveCasesResponse(BaseModel):
     username: str
     active_cases_count: int
     case_ids: list[str]
+
+
+# ==================== BE-301: Dashboard Schemas ====================
+
+class DashboardSummaryResponse(BaseModel):
+    """
+    Schema for dashboard summary statistics.
+    
+    Provides overview of case counts by status for selected period.
+    """
+    total_cases: int = Field(..., description="Total number of cases in period")
+    new_cases: int = Field(..., description="Cases with status NEW")
+    in_progress_cases: int = Field(..., description="Cases with status IN_PROGRESS")
+    needs_info_cases: int = Field(..., description="Cases with status NEEDS_INFO")
+    rejected_cases: int = Field(..., description="Cases with status REJECTED")
+    done_cases: int = Field(..., description="Cases with status DONE")
+    period_start: Optional[datetime] = Field(None, description="Start of the period (if specified)")
+    period_end: Optional[datetime] = Field(None, description="End of the period (if specified)")
+
+
+class StatusDistributionItem(BaseModel):
+    """Single item in status distribution"""
+    status: CaseStatus = Field(..., description="Case status")
+    count: int = Field(..., description="Number of cases with this status")
+    percentage: float = Field(..., description="Percentage of total cases")
+
+
+class StatusDistributionResponse(BaseModel):
+    """
+    Schema for status distribution response.
+    
+    Returns distribution of cases across all statuses with counts and percentages.
+    """
+    total_cases: int = Field(..., description="Total number of cases")
+    distribution: list[StatusDistributionItem] = Field(..., description="Distribution by status")
+    period_start: Optional[datetime] = Field(None, description="Start of the period")
+    period_end: Optional[datetime] = Field(None, description="End of the period")
+
+
+class OverdueCaseItem(BaseModel):
+    """Single overdue case item"""
+    id: str = Field(..., description="Case UUID")
+    public_id: int = Field(..., description="6-digit public ID")
+    category_name: str = Field(..., description="Category name")
+    applicant_name: str = Field(..., description="Applicant name")
+    created_at: datetime = Field(..., description="Creation date")
+    days_overdue: int = Field(..., description="Number of days in NEW status (>3 = overdue)")
+    responsible_id: Optional[str] = Field(None, description="Responsible executor UUID if assigned")
+    responsible_name: Optional[str] = Field(None, description="Responsible executor full name")
+
+
+class OverdueCasesResponse(BaseModel):
+    """
+    Schema for overdue cases list.
+    
+    Returns cases that are in NEW status for more than 3 days.
+    """
+    total_overdue: int = Field(..., description="Total number of overdue cases")
+    cases: list[OverdueCaseItem] = Field(..., description="List of overdue cases")
+
+
+class ExecutorEfficiencyItem(BaseModel):
+    """Single executor efficiency statistics"""
+    user_id: str = Field(..., description="Executor UUID")
+    full_name: str = Field(..., description="Executor full name")
+    email: str = Field(..., description="Executor email")
+    categories: list[str] = Field(..., description="List of category names")
+    current_in_progress: int = Field(..., description="Currently in progress cases")
+    completed_in_period: int = Field(..., description="Completed cases in selected period")
+    avg_completion_days: Optional[float] = Field(None, description="Average days to complete case")
+    overdue_count: int = Field(..., description="Number of overdue cases (>3 days in NEW)")
+
+
+class ExecutorEfficiencyResponse(BaseModel):
+    """
+    Schema for executors efficiency statistics.
+    
+    Returns performance metrics for all executors.
+    """
+    period_start: Optional[datetime] = Field(None, description="Start of the period")
+    period_end: Optional[datetime] = Field(None, description="End of the period")
+    executors: list[ExecutorEfficiencyItem] = Field(..., description="List of executor statistics")
+
+
+class CategoryTopItem(BaseModel):
+    """Single category in top categories list"""
+    category_id: str = Field(..., description="Category UUID")
+    category_name: str = Field(..., description="Category name")
+    total_cases: int = Field(..., description="Total cases in this category")
+    new_cases: int = Field(..., description="Cases with status NEW")
+    in_progress_cases: int = Field(..., description="Cases with status IN_PROGRESS")
+    completed_cases: int = Field(..., description="Cases with status DONE")
+    percentage_of_total: float = Field(..., description="Percentage of all cases")
+
+
+class CategoriesTopResponse(BaseModel):
+    """
+    Schema for top categories by case count.
+    
+    Returns TOP-N categories with most cases in selected period.
+    """
+    period_start: Optional[datetime] = Field(None, description="Start of the period")
+    period_end: Optional[datetime] = Field(None, description="End of the period")
+    total_cases_all_categories: int = Field(..., description="Total cases across all categories")
+    top_categories: list[CategoryTopItem] = Field(..., description="Top categories by case count")
+    limit: int = Field(..., description="Number of top categories returned")

@@ -1976,3 +1976,399 @@ def get_notification_stats(db: Session) -> dict:
         stats[status.value] = count
     
     return stats
+
+
+# ==================== BE-301: Dashboard Analytics Functions ====================
+
+def get_dashboard_summary(
+    db: Session,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None
+) -> dict:
+    """
+    Отримує загальну статистику звернень для дашборду.
+    
+    Args:
+        db: Database session
+        date_from: Початок періоду (ISO format)
+        date_to: Кінець періоду (ISO format)
+        
+    Returns:
+        Dictionary with summary statistics
+    """
+    from sqlalchemy import func
+    from datetime import datetime
+    
+    # Базовий запит
+    query = select(models.Case)
+    
+    # Фільтрація по даті створення
+    if date_from:
+        date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+        query = query.where(models.Case.created_at >= date_from_dt)
+    
+    if date_to:
+        date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+        query = query.where(models.Case.created_at <= date_to_dt)
+    
+    # Отримуємо загальну кількість
+    total_cases = db.execute(
+        select(func.count(models.Case.id)).select_from(query.subquery())
+    ).scalar() or 0
+    
+    # Рахуємо по статусах
+    status_counts = {}
+    for status in models.CaseStatus:
+        count_query = query.where(models.Case.status == status)
+        count = db.execute(
+            select(func.count(models.Case.id)).select_from(count_query.subquery())
+        ).scalar() or 0
+        status_counts[status.value] = count
+    
+    return {
+        'total_cases': total_cases,
+        'new_cases': status_counts.get('NEW', 0),
+        'in_progress_cases': status_counts.get('IN_PROGRESS', 0),
+        'needs_info_cases': status_counts.get('NEEDS_INFO', 0),
+        'rejected_cases': status_counts.get('REJECTED', 0),
+        'done_cases': status_counts.get('DONE', 0),
+        'period_start': datetime.fromisoformat(date_from.replace('Z', '+00:00')) if date_from else None,
+        'period_end': datetime.fromisoformat(date_to.replace('Z', '+00:00')) if date_to else None,
+    }
+
+
+def get_status_distribution(
+    db: Session,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None
+) -> dict:
+    """
+    Отримує розподіл звернень по статусах.
+    
+    Args:
+        db: Database session
+        date_from: Початок періоду (ISO format)
+        date_to: Кінець періоду (ISO format)
+        
+    Returns:
+        Dictionary with status distribution
+    """
+    from sqlalchemy import func
+    from datetime import datetime
+    
+    # Базовий запит
+    query = select(models.Case)
+    
+    # Фільтрація по даті
+    if date_from:
+        date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+        query = query.where(models.Case.created_at >= date_from_dt)
+    
+    if date_to:
+        date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+        query = query.where(models.Case.created_at <= date_to_dt)
+    
+    # Загальна кількість
+    total_cases = db.execute(
+        select(func.count(models.Case.id)).select_from(query.subquery())
+    ).scalar() or 0
+    
+    # Розподіл по статусах
+    distribution = []
+    for status in models.CaseStatus:
+        count_query = query.where(models.Case.status == status)
+        count = db.execute(
+            select(func.count(models.Case.id)).select_from(count_query.subquery())
+        ).scalar() or 0
+        
+        percentage = (count / total_cases * 100) if total_cases > 0 else 0.0
+        
+        distribution.append({
+            'status': status,
+            'count': count,
+            'percentage': round(percentage, 2)
+        })
+    
+    return {
+        'total_cases': total_cases,
+        'distribution': distribution,
+        'period_start': datetime.fromisoformat(date_from.replace('Z', '+00:00')) if date_from else None,
+        'period_end': datetime.fromisoformat(date_to.replace('Z', '+00:00')) if date_to else None,
+    }
+
+
+def get_overdue_cases(db: Session) -> dict:
+    """
+    Отримує список прострочених звернень (>3 днів в статусі NEW).
+    
+    Args:
+        db: Database session
+        
+    Returns:
+        Dictionary with overdue cases list
+    """
+    from datetime import datetime, timedelta
+    
+    # Дата 3 дні тому
+    three_days_ago = datetime.utcnow() - timedelta(days=3)
+    
+    # Запит прострочених звернень
+    query = (
+        select(models.Case)
+        .options(joinedload(models.Case.category))
+        .options(joinedload(models.Case.responsible))
+        .where(models.Case.status == models.CaseStatus.NEW)
+        .where(models.Case.created_at <= three_days_ago)
+        .order_by(models.Case.created_at.asc())
+    )
+    
+    overdue_cases = db.execute(query).scalars().all()
+    
+    # Формуємо список
+    cases_list = []
+    for case in overdue_cases:
+        days_overdue = (datetime.utcnow() - case.created_at).days
+        
+        cases_list.append({
+            'id': str(case.id),
+            'public_id': case.public_id,
+            'category_name': case.category.name if case.category else 'Unknown',
+            'applicant_name': case.applicant_name,
+            'created_at': case.created_at,
+            'days_overdue': days_overdue,
+            'responsible_id': str(case.responsible_id) if case.responsible_id else None,
+            'responsible_name': case.responsible.full_name if case.responsible else None,
+        })
+    
+    return {
+        'total_overdue': len(cases_list),
+        'cases': cases_list
+    }
+
+
+def get_executors_efficiency(
+    db: Session,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None
+) -> dict:
+    """
+    Отримує статистику ефективності виконавців.
+    
+    Args:
+        db: Database session
+        date_from: Початок періоду для підрахунку завершених (ISO format)
+        date_to: Кінець періоду для підрахунку завершених (ISO format)
+        
+    Returns:
+        Dictionary with executors efficiency data
+    """
+    from sqlalchemy import func, and_
+    from datetime import datetime, timedelta
+    
+    # Отримуємо всіх виконавців
+    executors = db.execute(
+        select(models.User)
+        .where(models.User.role == models.UserRole.EXECUTOR)
+        .where(models.User.is_active == True)
+    ).scalars().all()
+    
+    executors_data = []
+    
+    for executor in executors:
+        # Отримуємо категорії виконавця
+        executor_categories = db.execute(
+            select(models.ExecutorCategory)
+            .options(joinedload(models.ExecutorCategory.category))
+            .where(models.ExecutorCategory.user_id == executor.id)
+        ).scalars().all()
+        
+        category_names = [ec.category.name for ec in executor_categories if ec.category]
+        
+        # Кількість звернень в роботі зараз
+        current_in_progress = db.execute(
+            select(func.count(models.Case.id)).where(
+                and_(
+                    models.Case.responsible_id == executor.id,
+                    models.Case.status == models.CaseStatus.IN_PROGRESS
+                )
+            )
+        ).scalar() or 0
+        
+        # Завершені в періоді
+        completed_query = select(func.count(models.Case.id)).where(
+            and_(
+                models.Case.responsible_id == executor.id,
+                models.Case.status == models.CaseStatus.DONE
+            )
+        )
+        
+        if date_from:
+            date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+            completed_query = completed_query.where(models.Case.updated_at >= date_from_dt)
+        
+        if date_to:
+            date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            completed_query = completed_query.where(models.Case.updated_at <= date_to_dt)
+        
+        completed_in_period = db.execute(completed_query).scalar() or 0
+        
+        # Середній час виконання (в днях) для завершених в періоді
+        avg_completion_days = None
+        if completed_in_period > 0:
+            completed_cases_query = select(models.Case).where(
+                and_(
+                    models.Case.responsible_id == executor.id,
+                    models.Case.status == models.CaseStatus.DONE
+                )
+            )
+            
+            if date_from:
+                completed_cases_query = completed_cases_query.where(
+                    models.Case.updated_at >= date_from_dt
+                )
+            
+            if date_to:
+                completed_cases_query = completed_cases_query.where(
+                    models.Case.updated_at <= date_to_dt
+                )
+            
+            completed_cases = db.execute(completed_cases_query).scalars().all()
+            
+            total_days = 0
+            for case in completed_cases:
+                # Різниця між created_at та updated_at
+                delta = case.updated_at - case.created_at
+                total_days += delta.days
+            
+            avg_completion_days = round(total_days / completed_in_period, 1) if completed_in_period > 0 else None
+        
+        # Прострочені (>3 днів в NEW) з відповідальним = executor
+        three_days_ago = datetime.utcnow() - timedelta(days=3)
+        overdue_count = db.execute(
+            select(func.count(models.Case.id)).where(
+                and_(
+                    models.Case.responsible_id == executor.id,
+                    models.Case.status == models.CaseStatus.NEW,
+                    models.Case.created_at <= three_days_ago
+                )
+            )
+        ).scalar() or 0
+        
+        executors_data.append({
+            'user_id': str(executor.id),
+            'full_name': executor.full_name,
+            'email': executor.email,
+            'categories': category_names,
+            'current_in_progress': current_in_progress,
+            'completed_in_period': completed_in_period,
+            'avg_completion_days': avg_completion_days,
+            'overdue_count': overdue_count,
+        })
+    
+    return {
+        'period_start': datetime.fromisoformat(date_from.replace('Z', '+00:00')) if date_from else None,
+        'period_end': datetime.fromisoformat(date_to.replace('Z', '+00:00')) if date_to else None,
+        'executors': executors_data
+    }
+
+
+def get_top_categories(
+    db: Session,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 5
+) -> dict:
+    """
+    Отримує ТОП категорій по кількості звернень.
+    
+    Args:
+        db: Database session
+        date_from: Початок періоду (ISO format)
+        date_to: Кінець періоду (ISO format)
+        limit: Кількість категорій в топі (за замовчуванням 5)
+        
+    Returns:
+        Dictionary with top categories
+    """
+    from sqlalchemy import func
+    from datetime import datetime
+    
+    # Базовий запит
+    query = select(models.Case)
+    
+    # Фільтрація по даті
+    if date_from:
+        date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+        query = query.where(models.Case.created_at >= date_from_dt)
+    
+    if date_to:
+        date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+        query = query.where(models.Case.created_at <= date_to_dt)
+    
+    # Загальна кількість звернень
+    total_cases_all = db.execute(
+        select(func.count(models.Case.id)).select_from(query.subquery())
+    ).scalar() or 0
+    
+    # Групуємо по категоріях та рахуємо
+    category_stats_query = (
+        select(
+            models.Case.category_id,
+            func.count(models.Case.id).label('total_count')
+        )
+        .select_from(query.subquery())
+        .group_by(models.Case.category_id)
+        .order_by(func.count(models.Case.id).desc())
+        .limit(limit)
+    )
+    
+    category_stats = db.execute(category_stats_query).all()
+    
+    # Формуємо детальну статистику для кожної категорії
+    top_categories = []
+    for category_id, total_count in category_stats:
+        # Отримуємо категорію
+        category = db.execute(
+            select(models.Category).where(models.Category.id == category_id)
+        ).scalar_one_or_none()
+        
+        if not category:
+            continue
+        
+        # Рахуємо по статусах для цієї категорії
+        category_query = query.where(models.Case.category_id == category_id)
+        
+        new_count = db.execute(
+            select(func.count(models.Case.id))
+            .select_from(category_query.where(models.Case.status == models.CaseStatus.NEW).subquery())
+        ).scalar() or 0
+        
+        in_progress_count = db.execute(
+            select(func.count(models.Case.id))
+            .select_from(category_query.where(models.Case.status == models.CaseStatus.IN_PROGRESS).subquery())
+        ).scalar() or 0
+        
+        completed_count = db.execute(
+            select(func.count(models.Case.id))
+            .select_from(category_query.where(models.Case.status == models.CaseStatus.DONE).subquery())
+        ).scalar() or 0
+        
+        percentage = (total_count / total_cases_all * 100) if total_cases_all > 0 else 0.0
+        
+        top_categories.append({
+            'category_id': str(category.id),
+            'category_name': category.name,
+            'total_cases': total_count,
+            'new_cases': new_count,
+            'in_progress_cases': in_progress_count,
+            'completed_cases': completed_count,
+            'percentage_of_total': round(percentage, 2)
+        })
+    
+    return {
+        'period_start': datetime.fromisoformat(date_from.replace('Z', '+00:00')) if date_from else None,
+        'period_end': datetime.fromisoformat(date_to.replace('Z', '+00:00')) if date_to else None,
+        'total_cases_all_categories': total_cases_all,
+        'top_categories': top_categories,
+        'limit': limit
+    }

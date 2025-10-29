@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app import crud, schemas, models
 from app.database import get_db, check_db_connection
 from app.dependencies import get_current_user, require_admin, get_current_active_user
-from app.routers import auth, categories, channels, attachments, cases, comments, users
+from app.routers import auth, categories, channels, attachments, cases, comments, users, dashboard
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
@@ -100,6 +100,7 @@ app.include_router(attachments.router)
 app.include_router(cases.router)
 app.include_router(comments.router)
 app.include_router(users.router, prefix="/api")  # User management (ADMIN)
+app.include_router(dashboard.router)  # BE-301: Dashboard analytics (ADMIN)
 
 @app.get("/")
 async def root():
