@@ -36,6 +36,7 @@ import { AuthGuard } from '@/components/Auth';
 import { useAppSelector } from '@/store/hooks';
 import { selectUser } from '@/store/slices/authSlice';
 import { CaseStatus } from '@/store/slices/casesSlice';
+import { TakeCaseButton, ChangeStatusForm } from '@/components/Cases';
 import api from '@/lib/api';
 
 const { Title, Text, Paragraph } = Typography;
@@ -132,24 +133,25 @@ const CaseDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Завантаження деталей звернення
-  useEffect(() => {
+  // Функція для завантаження деталей звернення
+  const fetchCaseDetail = async () => {
     if (!id || !user) return;
 
-    const fetchCaseDetail = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await api.get(`/api/cases/${id}`);
-        setCaseDetail(response.data);
-      } catch (err: any) {
-        console.error('Failed to load case details:', err);
-        setError(err.response?.data?.detail || 'Помилка завантаження деталей звернення');
-      } finally {
-        setLoading(false);
-      }
-    };
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.get(`/api/cases/${id}`);
+      setCaseDetail(response.data);
+    } catch (err: any) {
+      console.error('Failed to load case details:', err);
+      setError(err.response?.data?.detail || 'Помилка завантаження деталей звернення');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Завантаження деталей звернення
+  useEffect(() => {
     fetchCaseDetail();
   }, [id, user]);
 
@@ -242,15 +244,35 @@ const CaseDetailPage: React.FC = () => {
             >
               Назад до списку
             </Button>
-            <Title level={2} style={{ margin: 0 }}>
-              Звернення #{caseDetail.public_id}
-              <Tag
-                color={statusColors[caseDetail.status]}
-                style={{ marginLeft: 16, fontSize: 16 }}
-              >
-                {statusLabels[caseDetail.status]}
-              </Tag>
-            </Title>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Title level={2} style={{ margin: 0 }}>
+                Звернення #{caseDetail.public_id}
+                <Tag
+                  color={statusColors[caseDetail.status]}
+                  style={{ marginLeft: 16, fontSize: 16 }}
+                >
+                  {statusLabels[caseDetail.status]}
+                </Tag>
+              </Title>
+              
+              {/* Кнопки дій виконавця */}
+              {user?.role === 'EXECUTOR' && (
+                <Space size="middle">
+                  <TakeCaseButton
+                    caseId={caseDetail.id}
+                    casePublicId={caseDetail.public_id}
+                    currentStatus={caseDetail.status}
+                    onSuccess={fetchCaseDetail}
+                  />
+                  <ChangeStatusForm
+                    caseId={caseDetail.id}
+                    casePublicId={caseDetail.public_id}
+                    currentStatus={caseDetail.status}
+                    onSuccess={fetchCaseDetail}
+                  />
+                </Space>
+              )}
+            </div>
           </div>
 
           <Row gutter={[24, 24]}>
