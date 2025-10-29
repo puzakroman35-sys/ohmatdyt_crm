@@ -329,3 +329,92 @@ class StatusHistory(Base):
             "new_status": self.new_status.value,
             "changed_at": self.changed_at.isoformat() if self.changed_at else None,
         }
+
+
+class NotificationStatus(str, enum.Enum):
+    """Notification delivery status enumeration"""
+    PENDING = "PENDING"      # Queued for sending
+    SENT = "SENT"           # Successfully sent
+    FAILED = "FAILED"       # Failed to send
+    RETRYING = "RETRYING"   # Retrying after failure
+
+
+class NotificationType(str, enum.Enum):
+    """Notification type enumeration"""
+    NEW_CASE = "NEW_CASE"                       # New case created
+    CASE_TAKEN = "CASE_TAKEN"                   # Case taken into work
+    STATUS_CHANGED = "STATUS_CHANGED"           # Case status changed
+    NEW_COMMENT = "NEW_COMMENT"                 # Comment added
+    TEMP_PASSWORD = "TEMP_PASSWORD"             # Temp password generated
+
+
+class NotificationLog(Base):
+    """
+    Notification log model for tracking all email notifications
+    
+    Logs all notification attempts for audit, debugging, and retry management.
+    Tracks delivery status, retry attempts, and error messages.
+    """
+    __tablename__ = "notification_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    
+    # Notification details
+    notification_type = Column(SQLEnum(NotificationType), nullable=False, index=True)
+    recipient_email = Column(String(100), nullable=False, index=True)
+    recipient_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    
+    # Related entity (e.g., case_id, comment_id)
+    related_case_id = Column(UUID(as_uuid=True), ForeignKey("cases.id", ondelete="CASCADE"), nullable=True, index=True)
+    related_entity_id = Column(String(100), nullable=True)  # For other entities
+    
+    # Email content
+    subject = Column(String(500), nullable=False)
+    body_text = Column(Text, nullable=True)  # Plain text version
+    body_html = Column(Text, nullable=True)  # HTML version
+    
+    # Delivery tracking
+    status = Column(SQLEnum(NotificationStatus), nullable=False, default=NotificationStatus.PENDING, index=True)
+    retry_count = Column(Integer, default=0, nullable=False)
+    max_retries = Column(Integer, default=5, nullable=False)
+    
+    # Error tracking
+    last_error = Column(Text, nullable=True)
+    error_details = Column(Text, nullable=True)  # JSON with full error info
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    sent_at = Column(DateTime, nullable=True)
+    failed_at = Column(DateTime, nullable=True)
+    next_retry_at = Column(DateTime, nullable=True, index=True)
+    
+    # Celery task tracking
+    celery_task_id = Column(String(255), nullable=True, index=True)
+    
+    # Relationships
+    recipient_user = relationship("User", foreign_keys=[recipient_user_id])
+    related_case = relationship("Case", foreign_keys=[related_case_id])
+
+    def __repr__(self):
+        return f"<NotificationLog(type={self.notification_type.value}, to={self.recipient_email}, status={self.status.value})>"
+
+    def to_dict(self):
+        """Convert notification log to dictionary"""
+        return {
+            "id": str(self.id),
+            "notification_type": self.notification_type.value,
+            "recipient_email": self.recipient_email,
+            "recipient_user_id": str(self.recipient_user_id) if self.recipient_user_id else None,
+            "related_case_id": str(self.related_case_id) if self.related_case_id else None,
+            "related_entity_id": self.related_entity_id,
+            "subject": self.subject,
+            "status": self.status.value,
+            "retry_count": self.retry_count,
+            "max_retries": self.max_retries,
+            "last_error": self.last_error,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "sent_at": self.sent_at.isoformat() if self.sent_at else None,
+            "failed_at": self.failed_at.isoformat() if self.failed_at else None,
+            "next_retry_at": self.next_retry_at.isoformat() if self.next_retry_at else None,
+            "celery_task_id": self.celery_task_id,
+        }

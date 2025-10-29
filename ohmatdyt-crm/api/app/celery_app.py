@@ -1,5 +1,6 @@
 import os
 from celery import Celery
+from typing import Optional
 
 # Load configuration from environment
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
@@ -25,6 +26,10 @@ celery.conf.update(
     task_soft_time_limit=25 * 60,  # 25 minutes
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=1000,
+    # Explicitly include task modules
+    imports=(
+        'app.celery_app',
+    ),
 )
 
 # Example task
@@ -52,78 +57,123 @@ def send_new_case_notification(self, case_id: str, case_public_id: int, category
     This task is queued when an operator creates a new case.
     It retrieves all executors for the category and sends them an email notification.
     
+    Improvements in BE-013:
+    - Logs notifications to notification_logs table
+    - Proper exponential backoff retry
+    - Email sending через email_service module
+    
     Args:
         case_id: UUID of the case (as string)
         case_public_id: 6-digit public ID of the case
         category_id: UUID of the category (as string)
-        
-    Note: This is a placeholder implementation. Full email functionality
-    will be implemented in BE-013 and BE-014.
     """
+    from uuid import UUID
+    from app.database import SessionLocal
+    from app import models, crud
+    from app.email_service import send_email, render_template
+    from datetime import datetime, timedelta
+    
+    db = SessionLocal()
+    
     try:
-        # Import here to avoid circular dependencies
-        from uuid import UUID
-        from app.database import SessionLocal
-        from app import crud
+        # Get case details
+        case = db.execute(
+            f"SELECT * FROM cases WHERE id = '{case_id}'"
+        ).first()
         
-        # Create database session
-        db = SessionLocal()
+        if not case:
+            print(f"[NOTIFICATION] Case {case_id} not found, skipping")
+            return {"status": "skipped", "reason": "case_not_found"}
         
-        try:
-            # Get case details
-            case = db.execute(
-                f"SELECT * FROM cases WHERE id = '{case_id}'"
-            ).first()
-            
-            if not case:
-                print(f"Case {case_id} not found, skipping notification")
-                return
-            
-            # Get category details
-            category = db.execute(
-                f"SELECT * FROM categories WHERE id = '{category_id}'"
-            ).first()
-            
-            category_name = category.name if category else "Unknown"
-            
-            # Get executors (simplified - gets all active executors)
-            executors = db.execute(
-                "SELECT * FROM users WHERE role IN ('EXECUTOR', 'ADMIN') AND is_active = true"
-            ).fetchall()
-            
-            # Log notification (placeholder for actual email sending)
-            print(f"[NOTIFICATION] New case #{case_public_id} created in category '{category_name}'")
-            print(f"[NOTIFICATION] Notifying {len(executors)} executor(s)")
-            
-            for executor in executors:
-                # Placeholder for actual email sending (will be implemented in BE-014)
-                print(f"[NOTIFICATION] Would send email to: {executor.email} ({executor.full_name})")
-                # TODO: Call email sending service here
-                # send_email(
-                #     to=executor.email,
-                #     subject=f"New case #{case_public_id}",
-                #     template="new_case",
-                #     context={...}
-                # )
-            
-            return {
-                "status": "success",
-                "case_id": case_id,
+        # Get category details
+        category = db.execute(
+            f"SELECT * FROM categories WHERE id = '{category_id}'"
+        ).first()
+        
+        category_name = category.name if category else "Unknown"
+        
+        # Get executors (simplified - gets all active executors)
+        executors = db.execute(
+            "SELECT * FROM users WHERE role IN ('EXECUTOR', 'ADMIN') AND is_active = true"
+        ).fetchall()
+        
+        print(f"[BE-013] Sending notifications for new case #{case_public_id}")
+        print(f"[BE-013] Category: {category_name}")
+        print(f"[BE-013] Executors to notify: {len(executors)}")
+        
+        sent_count = 0
+        failed_count = 0
+        
+        for executor in executors:
+            # Render email template
+            text_body, html_body = render_template("new_case", {
                 "public_id": case_public_id,
-                "executors_notified": len(executors)
-            }
+                "category": category_name,
+                "channel": "Email",  # TODO: get from case
+                "applicant_name": case.applicant_name,
+                "summary": case.summary[:200] + "..." if len(case.summary) > 200 else case.summary,
+            })
             
-        finally:
-            db.close()
+            # Create notification log entry
+            notification = crud.create_notification_log(
+                db=db,
+                notification_type=models.NotificationType.NEW_CASE,
+                recipient_email=executor.email,
+                recipient_user_id=UUID(executor.id),
+                related_case_id=UUID(case_id),
+                subject=f"Нове звернення #{case_public_id}",
+                body_text=text_body,
+                body_html=html_body,
+                celery_task_id=self.request.id,
+            )
             
-    except Exception as exc:
-        # Retry with exponential backoff
-        print(f"Error sending notification for case {case_public_id}: {exc}")
+            # Send email
+            success = send_email(
+                to=executor.email,
+                subject=f"Нове звернення #{case_public_id}",
+                body_text=text_body,
+                body_html=html_body,
+                notification_log_id=notification.id,
+            )
+            
+            # Update notification status
+            if success:
+                crud.update_notification_status(
+                    db=db,
+                    notification_id=notification.id,
+                    status=models.NotificationStatus.SENT,
+                )
+                sent_count += 1
+            else:
+                crud.update_notification_status(
+                    db=db,
+                    notification_id=notification.id,
+                    status=models.NotificationStatus.FAILED,
+                    error_message="SMTP send failed (placeholder)",
+                )
+                failed_count += 1
         
-        # Calculate exponential backoff: 60s, 120s, 240s, 480s, 960s
+        print(f"[BE-013] Sent: {sent_count}, Failed: {failed_count}")
+        
+        return {
+            "status": "completed",
+            "case_id": case_id,
+            "public_id": case_public_id,
+            "sent": sent_count,
+            "failed": failed_count,
+        }
+        
+    except Exception as exc:
+        # Log error
+        print(f"[BE-013] Error in send_new_case_notification: {exc}")
+        
+        # Exponential backoff: 60s, 120s, 240s, 480s, 960s
         retry_delay = 60 * (2 ** self.request.retries)
         
-        raise self.retry(exc=exc, countdown=retry_delay)
+        raise self.retry(exc=exc, countdown=retry_delay, max_retries=5)
+        
+    finally:
+        db.close()
 
 
 @celery.task(
@@ -470,6 +520,9 @@ def send_comment_notification(
         retry_delay = 60 * (2 ** self.request.retries)
         raise self.retry(exc=exc, countdown=retry_delay)
 
+
+# Auto-discover tasks from this module
+celery.autodiscover_tasks(['app.celery_app'], related_name='', force=True)
 
 # Auto-discover tasks from other modules (will be added later)
 # celery.autodiscover_tasks(['app.tasks'])

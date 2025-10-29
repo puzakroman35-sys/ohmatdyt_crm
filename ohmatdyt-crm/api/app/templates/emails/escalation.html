@@ -1,0 +1,57 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>⚠️ Звернення потребує уваги</h2>
+
+<p>Звернення <span class="case-id">#{{ case_public_id }}</span> вимагає негайної уваги!</p>
+
+<div style="background-color: #fff1f0; border: 2px solid #cf1322; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <h3 style="margin-top: 0; color: #a8071a;">🚨 Причина ескалації</h3>
+    <p style="font-size: 16px; font-weight: 600; color: #262626;">
+        {{ escalation_reason }}
+    </p>
+</div>
+
+<div class="info-block">
+    <p><span class="info-label">Номер звернення:</span> <span class="case-id">#{{ case_public_id }}</span></p>
+    <p><span class="info-label">Дата створення:</span> <span class="info-value">{{ created_at }}</span></p>
+    <p><span class="info-label">Дата ескалації:</span> <span class="info-value">{{ escalated_at }}</span></p>
+    <p><span class="info-label">Виконавець:</span> <span class="info-value">{{ executor_name }}</span></p>
+    <p><span class="info-label">Поточний статус:</span> 
+        <span class="status-badge status-{{ status_class }}">{{ status_display }}</span>
+    </p>
+</div>
+
+{% if days_overdue > 0 %}
+<div style="background-color: #fff7e6; border-left: 4px solid #faad14; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <p style="margin: 0; font-weight: 600; color: #ad6800;">
+        ⏱️ Прострочено на <strong>{{ days_overdue }} днів</strong>
+    </p>
+</div>
+{% endif %}
+
+<h3>Деталі звернення:</h3>
+<div class="info-block">
+    <p><span class="info-label">Категорія:</span> <span class="info-value">{{ category_name }}</span></p>
+    <p><span class="info-label">Заявник:</span> <span class="info-value">{{ applicant_name }}</span></p>
+    {% if applicant_phone %}
+    <p><span class="info-label">Телефон:</span> <span class="info-value">{{ applicant_phone }}</span></p>
+    {% endif %}
+</div>
+
+<h3>Суть звернення:</h3>
+<div class="comment-box">
+    {{ description }}
+</div>
+
+<p style="text-align: center; margin-top: 30px;">
+    <a href="{{ crm_url }}/cases/{{ case_public_id }}" class="button" style="background-color: #cf1322;">
+        Терміново переглянути
+    </a>
+</p>
+
+<hr>
+<p style="color: #8c8c8c; font-size: 14px;">
+    <strong>Необхідні дії:</strong> Будь ласка, перегляньте звернення та вживіть необхідних заходів якомога швидше.
+</p>
+{% endblock %}

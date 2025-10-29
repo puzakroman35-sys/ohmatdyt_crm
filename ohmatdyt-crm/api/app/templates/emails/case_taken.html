@@ -1,0 +1,30 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>✅ Звернення взято в роботу</h2>
+
+<p>Звернення <span class="case-id">#{{ case_public_id }}</span> взято в роботу виконавцем.</p>
+
+<div class="info-block">
+    <p><span class="info-label">Номер звернення:</span> <span class="case-id">#{{ case_public_id }}</span></p>
+    <p><span class="info-label">Виконавець:</span> <span class="info-value">{{ executor_name }}</span></p>
+    <p><span class="info-label">Email виконавця:</span> <span class="info-value">{{ executor_email }}</span></p>
+    <p><span class="info-label">Статус:</span> <span class="status-badge status-in-progress">В роботі</span></p>
+    <p><span class="info-label">Дата взяття:</span> <span class="info-value">{{ taken_at }}</span></p>
+</div>
+
+<h3>Деталі звернення:</h3>
+<div class="info-block">
+    <p><span class="info-label">Категорія:</span> <span class="info-value">{{ category_name }}</span></p>
+    <p><span class="info-label">Заявник:</span> <span class="info-value">{{ applicant_name }}</span></p>
+</div>
+
+<p style="text-align: center; margin-top: 30px;">
+    <a href="{{ crm_url }}/cases/{{ case_public_id }}" class="button">Переглянути звернення</a>
+</p>
+
+<hr>
+<p style="color: #8c8c8c; font-size: 14px;">
+    Ви отримали це повідомлення, оскільки є оператором, який створив це звернення.
+</p>
+{% endblock %}

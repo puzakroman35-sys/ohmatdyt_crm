@@ -1,0 +1,45 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>🔄 Статус звернення змінено</h2>
+
+<p>Статус звернення <span class="case-id">#{{ case_public_id }}</span> було змінено.</p>
+
+<div class="info-block">
+    <p><span class="info-label">Номер звернення:</span> <span class="case-id">#{{ case_public_id }}</span></p>
+    <p><span class="info-label">Попередній статус:</span> <span class="info-value">{{ old_status_display }}</span></p>
+    <p><span class="info-label">Новий статус:</span> 
+        <span class="status-badge status-{{ new_status_class }}">{{ new_status_display }}</span>
+    </p>
+    <p><span class="info-label">Дата зміни:</span> <span class="info-value">{{ changed_at }}</span></p>
+    <p><span class="info-label">Виконавець:</span> <span class="info-value">{{ executor_name }}</span></p>
+</div>
+
+{% if status_comment %}
+<h3>Коментар до зміни статусу:</h3>
+<div class="comment-box">
+    {{ status_comment }}
+</div>
+{% endif %}
+
+<h3>Деталі звернення:</h3>
+<div class="info-block">
+    <p><span class="info-label">Категорія:</span> <span class="info-value">{{ category_name }}</span></p>
+    <p><span class="info-label">Заявник:</span> <span class="info-value">{{ applicant_name }}</span></p>
+</div>
+
+<p style="text-align: center; margin-top: 30px;">
+    <a href="{{ crm_url }}/cases/{{ case_public_id }}" class="button">Переглянути звернення</a>
+</p>
+
+<hr>
+<p style="color: #8c8c8c; font-size: 14px;">
+    {% if new_status == 'DONE' %}
+    <strong>Звернення завершено.</strong> Дякуємо за звернення до Національної дитячої спеціалізованої лікарні "ОХМАТДИТ".
+    {% elif new_status == 'NEEDS_INFO' %}
+    <strong>Потрібна додаткова інформація.</strong> Будь ласка, надайте запитувані дані.
+    {% elif new_status == 'REJECTED' %}
+    <strong>Звернення відхилено.</strong> Див. коментар виконавця для деталей.
+    {% endif %}
+</p>
+{% endblock %}

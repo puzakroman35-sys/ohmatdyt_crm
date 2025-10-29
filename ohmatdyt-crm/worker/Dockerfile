@@ -7,15 +7,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements from API
-COPY requirements.txt .
+# Copy requirements from API directory
+COPY ./api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code (will be mounted or copied via build context)
+# Copy application code from API directory
 RUN mkdir -p /app/app
-COPY app /app/app
+COPY ./api/app /app/app
 
-COPY entrypoint.sh /entrypoint.sh
+COPY ./worker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 RUN mkdir -p /var/app/media /var/app/static

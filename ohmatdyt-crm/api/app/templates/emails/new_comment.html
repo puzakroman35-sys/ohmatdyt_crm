@@ -1,0 +1,48 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>💬 Новий коментар до звернення</h2>
+
+<p>До звернення <span class="case-id">#{{ case_public_id }}</span> додано новий коментар.</p>
+
+<div class="info-block">
+    <p><span class="info-label">Номер звернення:</span> <span class="case-id">#{{ case_public_id }}</span></p>
+    <p><span class="info-label">Автор коментаря:</span> <span class="info-value">{{ author_name }}</span></p>
+    <p><span class="info-label">Роль автора:</span> <span class="info-value">{{ author_role }}</span></p>
+    <p><span class="info-label">Тип коментаря:</span> 
+        {% if is_internal %}
+        <span class="status-badge" style="background-color: #fff7e6; color: #ad6800;">🔒 Внутрішній</span>
+        {% else %}
+        <span class="status-badge" style="background-color: #e6f7ff; color: #0050b3;">👁️ Публічний</span>
+        {% endif %}
+    </p>
+    <p><span class="info-label">Дата додавання:</span> <span class="info-value">{{ created_at }}</span></p>
+</div>
+
+<h3>Текст коментаря:</h3>
+<div class="comment-box">
+    {{ comment_text }}
+</div>
+
+<h3>Деталі звернення:</h3>
+<div class="info-block">
+    <p><span class="info-label">Категорія:</span> <span class="info-value">{{ category_name }}</span></p>
+    <p><span class="info-label">Поточний статус:</span> 
+        <span class="status-badge status-{{ status_class }}">{{ status_display }}</span>
+    </p>
+    <p><span class="info-label">Заявник:</span> <span class="info-value">{{ applicant_name }}</span></p>
+</div>
+
+<p style="text-align: center; margin-top: 30px;">
+    <a href="{{ crm_url }}/cases/{{ case_public_id }}" class="button">Переглянути звернення</a>
+</p>
+
+<hr>
+<p style="color: #8c8c8c; font-size: 14px;">
+    {% if is_internal %}
+    <strong>Увага:</strong> Це внутрішній коментар, видимий тільки співробітникам системи.
+    {% else %}
+    Це публічний коментар, доступний для перегляду всім учасникам звернення.
+    {% endif %}
+</p>
+{% endblock %}

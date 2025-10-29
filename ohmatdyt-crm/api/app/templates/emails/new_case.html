@@ -1,0 +1,45 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>📋 Нове звернення призначено</h2>
+
+<p>Вітаємо, <strong>{{ executor_name }}</strong>!</p>
+
+<p>Вам призначено нове звернення для обробки.</p>
+
+<div class="info-block">
+    <p><span class="info-label">Номер звернення:</span> <span class="case-id">#{{ case_public_id }}</span></p>
+    <p><span class="info-label">Категорія:</span> <span class="info-value">{{ category_name }}</span></p>
+    <p><span class="info-label">Канал звернення:</span> <span class="info-value">{{ channel_name }}</span></p>
+    <p><span class="info-label">Дата створення:</span> <span class="info-value">{{ created_at }}</span></p>
+</div>
+
+<h3>Заявник:</h3>
+<div class="info-block">
+    <p><span class="info-label">Ім'я:</span> <span class="info-value">{{ applicant_name }}</span></p>
+    {% if applicant_phone %}
+    <p><span class="info-label">Телефон:</span> <span class="info-value">{{ applicant_phone }}</span></p>
+    {% endif %}
+    {% if applicant_email %}
+    <p><span class="info-label">Email:</span> <span class="info-value">{{ applicant_email }}</span></p>
+    {% endif %}
+</div>
+
+<h3>Суть звернення:</h3>
+<div class="comment-box">
+    {{ description }}
+</div>
+
+{% if subcategory %}
+<p><span class="info-label">Підкатегорія:</span> <span class="info-value">{{ subcategory }}</span></p>
+{% endif %}
+
+<p style="text-align: center; margin-top: 30px;">
+    <a href="{{ crm_url }}/cases/{{ case_public_id }}" class="button">Переглянути звернення</a>
+</p>
+
+<hr>
+<p style="color: #8c8c8c; font-size: 14px;">
+    <strong>Важливо:</strong> Будь ласка, візьміть звернення в роботу якомога швидше.
+</p>
+{% endblock %}

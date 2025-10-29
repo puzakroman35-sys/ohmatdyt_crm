@@ -1641,3 +1641,167 @@ def deactivate_user_with_check(
     db.refresh(db_user)
     
     return True, None, None
+
+
+# ============================================================================
+# Notification Log CRUD
+# ============================================================================
+
+def create_notification_log(
+    db: Session,
+    notification_type: models.NotificationType,
+    recipient_email: str,
+    subject: str,
+    body_text: Optional[str] = None,
+    body_html: Optional[str] = None,
+    recipient_user_id: Optional[UUID] = None,
+    related_case_id: Optional[UUID] = None,
+    related_entity_id: Optional[str] = None,
+    celery_task_id: Optional[str] = None,
+) -> models.NotificationLog:
+    """
+    Створює запис в логу нотифікацій.
+    
+    Args:
+        db: Database session
+        notification_type: Тип нотифікації (NEW_CASE, CASE_TAKEN, etc.)
+        recipient_email: Email отримувача
+        subject: Тема листа
+        body_text: Текстова версія листа
+        body_html: HTML версія листа
+        recipient_user_id: UUID отримувача (якщо є)
+        related_case_id: UUID пов'язаного звернення
+        related_entity_id: ID іншої пов'язаної сутності
+        celery_task_id: ID Celery таски
+        
+    Returns:
+        Created notification log entry
+    """
+    notification = models.NotificationLog(
+        notification_type=notification_type,
+        recipient_email=recipient_email,
+        recipient_user_id=recipient_user_id,
+        related_case_id=related_case_id,
+        related_entity_id=related_entity_id,
+        subject=subject,
+        body_text=body_text,
+        body_html=body_html,
+        status=models.NotificationStatus.PENDING,
+        celery_task_id=celery_task_id,
+    )
+    
+    db.add(notification)
+    db.commit()
+    db.refresh(notification)
+    
+    return notification
+
+
+def update_notification_status(
+    db: Session,
+    notification_id: UUID,
+    status: models.NotificationStatus,
+    error_message: Optional[str] = None,
+    error_details: Optional[str] = None,
+) -> Optional[models.NotificationLog]:
+    """
+    Оновлює статус нотифікації.
+    
+    Args:
+        db: Database session
+        notification_id: UUID нотифікації
+        status: Новий статус (SENT, FAILED, RETRYING)
+        error_message: Повідомлення про помилку
+        error_details: Детальна інформація про помилку
+        
+    Returns:
+        Updated notification log or None if not found
+    """
+    notification = db.execute(
+        select(models.NotificationLog).where(
+            models.NotificationLog.id == notification_id
+        )
+    ).scalar_one_or_none()
+    
+    if not notification:
+        return None
+    
+    notification.status = status
+    
+    if status == models.NotificationStatus.SENT:
+        from datetime import datetime
+        notification.sent_at = datetime.utcnow()
+    elif status == models.NotificationStatus.FAILED:
+        from datetime import datetime
+        notification.failed_at = datetime.utcnow()
+        if error_message:
+            notification.last_error = error_message
+        if error_details:
+            notification.error_details = error_details
+    elif status == models.NotificationStatus.RETRYING:
+        notification.retry_count += 1
+        if error_message:
+            notification.last_error = error_message
+    
+    db.commit()
+    db.refresh(notification)
+    
+    return notification
+
+
+def get_pending_notifications(
+    db: Session,
+    limit: int = 100
+) -> list[models.NotificationLog]:
+    """
+    Отримує нотифікації в статусі PENDING або RETRYING для повторної відправки.
+    
+    Args:
+        db: Database session
+        limit: Максимальна кількість записів
+        
+    Returns:
+        List of pending notifications
+    """
+    from datetime import datetime
+    
+    query = select(models.NotificationLog).where(
+        models.NotificationLog.status.in_([
+            models.NotificationStatus.PENDING,
+            models.NotificationStatus.RETRYING
+        ]),
+        models.NotificationLog.retry_count < models.NotificationLog.max_retries
+    ).order_by(
+        models.NotificationLog.created_at.asc()
+    ).limit(limit)
+    
+    # Фільтр для ретраїв: тільки ті, у яких настав час next_retry_at
+    query = query.where(
+        (models.NotificationLog.next_retry_at.is_(None)) |
+        (models.NotificationLog.next_retry_at <= datetime.utcnow())
+    )
+    
+    notifications = db.execute(query).scalars().all()
+    return list(notifications)
+
+
+def get_notification_stats(db: Session) -> dict:
+    """
+    Отримує статистику по нотифікаціям.
+    
+    Returns:
+        Dictionary with counts by status
+    """
+    from sqlalchemy import func
+    
+    stats = {}
+    
+    for status in models.NotificationStatus:
+        count = db.execute(
+            select(func.count(models.NotificationLog.id)).where(
+                models.NotificationLog.status == status
+            )
+        ).scalar()
+        stats[status.value] = count
+    
+    return stats

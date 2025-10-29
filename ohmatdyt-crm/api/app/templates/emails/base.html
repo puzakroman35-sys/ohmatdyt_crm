@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+            color: #ffffff;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .content h2 {
+            color: #1890ff;
+            font-size: 20px;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .info-block {
+            background-color: #f0f5ff;
+            border-left: 4px solid #1890ff;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .info-block p {
+            margin: 8px 0;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #595959;
+            display: inline-block;
+            min-width: 120px;
+        }
+        .info-value {
+            color: #262626;
+        }
+        .case-id {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1890ff;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .status-new { background-color: #e6f7ff; color: #0050b3; }
+        .status-in-progress { background-color: #fff7e6; color: #ad6800; }
+        .status-needs-info { background-color: #fff1f0; color: #a8071a; }
+        .status-done { background-color: #f6ffed; color: #135200; }
+        .status-rejected { background-color: #f5f5f5; color: #595959; }
+        .comment-box {
+            background-color: #fafafa;
+            border: 1px solid #e8e8e8;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            font-style: italic;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #1890ff;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+        .button:hover {
+            background-color: #096dd9;
+        }
+        .footer {
+            background-color: #fafafa;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #e8e8e8;
+            font-size: 12px;
+            color: #8c8c8c;
+        }
+        .footer a {
+            color: #1890ff;
+            text-decoration: none;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #e8e8e8;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 Ohmatdyt CRM</h1>
+        </div>
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+        <div class="footer">
+            <p>Це автоматичне повідомлення від системи Ohmatdyt CRM</p>
+            <p>Національна дитяча спеціалізована лікарня "ОХМАТДИТ"</p>
+            <p>&copy; {{ current_year }} Всі права захищені</p>
+        </div>
+    </div>
+</body>
+</html>
