@@ -36,7 +36,7 @@ import { AuthGuard } from '@/components/Auth';
 import { useAppSelector } from '@/store/hooks';
 import { selectUser } from '@/store/slices/authSlice';
 import { CaseStatus } from '@/store/slices/casesSlice';
-import { TakeCaseButton, ChangeStatusForm } from '@/components/Cases';
+import { TakeCaseButton, ChangeStatusForm, AddCommentForm } from '@/components/Cases';
 import api from '@/lib/api';
 
 const { Title, Text, Paragraph } = Typography;
@@ -453,6 +453,15 @@ const CaseDetailPage: React.FC = () => {
 
             {/* Коментарі */}
             <Col xs={24}>
+              {/* Форма додавання коментаря */}
+              <AddCommentForm
+                caseId={caseDetail.id}
+                casePublicId={caseDetail.public_id}
+                userRole={user?.role}
+                onSuccess={fetchCaseDetail}
+              />
+
+              {/* Список коментарів */}
               <Card title="Коментарі" bordered={false}>
                 {caseDetail.comments.length > 0 ? (
                   <List
