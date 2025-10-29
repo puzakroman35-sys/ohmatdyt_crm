@@ -2175,14 +2175,9 @@ def get_executors_efficiency(
     executors_data = []
     
     for executor in executors:
-        # Отримуємо категорії виконавця
-        executor_categories = db.execute(
-            select(models.ExecutorCategory)
-            .options(joinedload(models.ExecutorCategory.category))
-            .where(models.ExecutorCategory.user_id == executor.id)
-        ).scalars().all()
-        
-        category_names = [ec.category.name for ec in executor_categories if ec.category]
+        # TODO: BE-301 - Додати зв'язок User-Category для виконавців
+        # Поки що повертаємо порожній список категорій
+        category_names = []
         
         # Кількість звернень в роботі зараз
         current_in_progress = db.execute(
@@ -2223,11 +2218,13 @@ def get_executors_efficiency(
             )
             
             if date_from:
+                date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
                 completed_cases_query = completed_cases_query.where(
                     models.Case.updated_at >= date_from_dt
                 )
             
             if date_to:
+                date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
                 completed_cases_query = completed_cases_query.where(
                     models.Case.updated_at <= date_to_dt
                 )

@@ -179,7 +179,7 @@ async def get_executors_efficiency(
     ),
     date_to: Optional[str] = Query(
         None,
-        description="End date for completed cases filtering (ISO format)"
+        description="End date for filtering (ISO format)"
     ),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_admin)
@@ -204,19 +204,26 @@ async def get_executors_efficiency(
     Для таблиці "Ефективність виконавців" на дашборді.
     Можна сортувати за будь-якою колонкою на фронтенді.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"[EXECUTORS-EFFICIENCY] Start with date_from={date_from}, date_to={date_to}")
         efficiency = crud.get_executors_efficiency(
             db=db,
             date_from=date_from,
             date_to=date_to
         )
+        logger.info(f"[EXECUTORS-EFFICIENCY] Success! Executors count: {len(efficiency.get('executors', []))}")
         return efficiency
     except ValueError as e:
+        logger.error(f"[EXECUTORS-EFFICIENCY] ValueError: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid date format: {str(e)}"
         )
     except Exception as e:
+        logger.error(f"[EXECUTORS-EFFICIENCY] Exception: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get executors efficiency: {str(e)}"
