@@ -365,7 +365,32 @@ async def list_my_cases(
             author_id=str(case.author_id),
             responsible_id=str(case.responsible_id) if case.responsible_id else None,
             created_at=case.created_at,
-            updated_at=case.updated_at
+            updated_at=case.updated_at,
+            # Add nested objects for frontend
+            category=schemas.CategoryResponse(
+                id=str(case.category.id),
+                name=case.category.name,
+                is_active=case.category.is_active,
+                created_at=case.category.created_at,
+                updated_at=case.category.updated_at
+            ) if case.category else None,
+            channel=schemas.ChannelResponse(
+                id=str(case.channel.id),
+                name=case.channel.name,
+                is_active=case.channel.is_active,
+                created_at=case.channel.created_at,
+                updated_at=case.channel.updated_at
+            ) if case.channel else None,
+            responsible=schemas.UserResponse(
+                id=str(case.responsible.id),
+                username=case.responsible.username,
+                email=case.responsible.email,
+                full_name=case.responsible.full_name,
+                role=case.responsible.role,
+                is_active=case.responsible.is_active,
+                created_at=case.responsible.created_at,
+                updated_at=case.responsible.updated_at
+            ) if case.responsible else None
         )
         for case in cases
     ]
@@ -521,7 +546,32 @@ async def list_assigned_cases(
             author_id=str(case.author_id),
             responsible_id=str(case.responsible_id) if case.responsible_id else None,
             created_at=case.created_at,
-            updated_at=case.updated_at
+            updated_at=case.updated_at,
+            # Add nested objects for frontend
+            category=schemas.CategoryResponse(
+                id=str(case.category.id),
+                name=case.category.name,
+                is_active=case.category.is_active,
+                created_at=case.category.created_at,
+                updated_at=case.category.updated_at
+            ) if case.category else None,
+            channel=schemas.ChannelResponse(
+                id=str(case.channel.id),
+                name=case.channel.name,
+                is_active=case.channel.is_active,
+                created_at=case.channel.created_at,
+                updated_at=case.channel.updated_at
+            ) if case.channel else None,
+            responsible=schemas.UserResponse(
+                id=str(case.responsible.id),
+                username=case.responsible.username,
+                email=case.responsible.email,
+                full_name=case.responsible.full_name,
+                role=case.responsible.role,
+                is_active=case.responsible.is_active,
+                created_at=case.responsible.created_at,
+                updated_at=case.responsible.updated_at
+            ) if case.responsible else None
         )
         for case in cases
     ]
@@ -871,7 +921,32 @@ async def list_cases(
             author_id=str(case.author_id),
             responsible_id=str(case.responsible_id) if case.responsible_id else None,
             created_at=case.created_at,
-            updated_at=case.updated_at
+            updated_at=case.updated_at,
+            # Add nested objects for frontend
+            category=schemas.CategoryResponse(
+                id=str(case.category.id),
+                name=case.category.name,
+                is_active=case.category.is_active,
+                created_at=case.category.created_at,
+                updated_at=case.category.updated_at
+            ) if case.category else None,
+            channel=schemas.ChannelResponse(
+                id=str(case.channel.id),
+                name=case.channel.name,
+                is_active=case.channel.is_active,
+                created_at=case.channel.created_at,
+                updated_at=case.channel.updated_at
+            ) if case.channel else None,
+            responsible=schemas.UserResponse(
+                id=str(case.responsible.id),
+                username=case.responsible.username,
+                email=case.responsible.email,
+                full_name=case.responsible.full_name,
+                role=case.responsible.role,
+                is_active=case.responsible.is_active,
+                created_at=case.responsible.created_at,
+                updated_at=case.responsible.updated_at
+            ) if case.responsible else None
         )
         for case in cases
     ]

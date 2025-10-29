@@ -2,7 +2,7 @@
 
 from typing import Optional
 from uuid import UUID
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select
 
 from app import models, schemas
@@ -837,7 +837,11 @@ def get_all_cases(
     """
     from datetime import datetime
     
-    query = select(models.Case)
+    query = select(models.Case).options(
+        joinedload(models.Case.category),
+        joinedload(models.Case.channel),
+        joinedload(models.Case.responsible)
+    )
     
     # Apply filters (AND logic)
     # Single value filters (backward compatibility)
