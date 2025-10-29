@@ -55,9 +55,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: 'Адміністрування',
       children: [
         {
-          key: '/admin/users',
+          key: '/users',
           label: 'Користувачі',
-          onClick: () => router.push('/admin/users'),
+          onClick: () => router.push('/users'),
         },
         {
           key: '/admin/categories',

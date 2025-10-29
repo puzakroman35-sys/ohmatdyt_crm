@@ -6,11 +6,13 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import casesReducer from './slices/casesSlice';
+import usersReducer from './slices/usersSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     cases: casesReducer,
+    users: usersReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
