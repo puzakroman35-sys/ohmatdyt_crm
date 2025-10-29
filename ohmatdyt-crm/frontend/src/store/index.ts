@@ -7,12 +7,16 @@ import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import casesReducer from './slices/casesSlice';
 import usersReducer from './slices/usersSlice';
+import categoriesReducer from './slices/categoriesSlice';
+import channelsReducer from './slices/channelsSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     cases: casesReducer,
     users: usersReducer,
+    categories: categoriesReducer,
+    channels: channelsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

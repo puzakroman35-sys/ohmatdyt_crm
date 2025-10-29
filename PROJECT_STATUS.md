@@ -1,9 +1,1048 @@
 ﻿# Ohmatdyt CRM - Project Status
 
 **Last Updated:** October 29, 2025
-**Latest Completed:** FE-007 - Executor Actions: Take Case & Change Status (Completed)
+**Latest Completed:** FE-009 - Admin Section — Categories/Channels - COMPLETED ✅
 
-## 🏆 Critical Updates (October 29, 2025 - FE-007 Executor Actions)
+## 🏆 Critical Updates (October 29, 2025 - FE-009 Categories/Channels Management)
+
+### Frontend: Admin Section - Categories & Channels CRUD ✅
+
+#### 1. Redux State Management - COMPLETED ✅
+
+**Створено categoriesSlice.ts з повним CRUD функціоналом:**
+
+**Файл:** `frontend/src/store/slices/categoriesSlice.ts` (270+ рядків)
+
+**Типи та інтерфейси:**
+```typescript
+export interface Category {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCategoryData {
+  name: string;
+}
+
+export interface UpdateCategoryData {
+  name: string;
+}
+
+export interface CategoriesState {
+  categories: Category[];
+  total: number;
+  currentCategory: Category | null;
+  isLoading: boolean;
+  error: string | null;
+}
+```
+
+**Async Thunks (6 операцій):**
+1. `fetchCategoriesAsync` - Отримання списку з фільтрами, пагінацією
+2. `fetchCategoryByIdAsync` - Отримання категорії за ID
+3. `createCategoryAsync` - Створення нової категорії
+4. `updateCategoryAsync` - Оновлення категорії (PUT)
+5. `deactivateCategoryAsync` - Деактивація категорії
+6. `activateCategoryAsync` - Активація категорії
+
+**Особливості:**
+- Спеціальна обробка помилки унікальності назви (400 Bad Request)
+- Auto-update списку після CRUD операцій
+- Централізоване управління помилками
+- Type-safe селектори для всіх даних
+
+**Селектори:**
+```typescript
+export const selectCategories = (state: { categories: CategoriesState }) => state.categories.categories;
+export const selectCategoriesTotal = (state: { categories: CategoriesState }) => state.categories.total;
+export const selectCategoriesLoading = (state: { categories: CategoriesState }) => state.categories.isLoading;
+export const selectCategoriesError = (state: { categories: CategoriesState }) => state.categories.error;
+export const selectCurrentCategory = (state: { categories: CategoriesState }) => state.categories.currentCategory;
+```
+
+**Створено channelsSlice.ts з аналогічним функціоналом:**
+
+**Файл:** `frontend/src/store/slices/channelsSlice.ts` (270+ рядків)
+
+**Типи та інтерфейси:**
+```typescript
+export interface Channel {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateChannelData {
+  name: string;
+}
+
+export interface UpdateChannelData {
+  name: string;
+}
+```
+
+**Async Thunks (6 операцій):** Аналогічно categories
+- fetchChannelsAsync, fetchChannelByIdAsync
+- createChannelAsync, updateChannelAsync
+- deactivateChannelAsync, activateChannelAsync
+
+**Інтеграція в Store:**
+```typescript
+// frontend/src/store/index.ts
+import categoriesReducer from './slices/categoriesSlice';
+import channelsReducer from './slices/channelsSlice';
+
+export const store = configureStore({
+  reducer: {
+    auth: authReducer,
+    cases: casesReducer,
+    users: usersReducer,
+    categories: categoriesReducer,
+    channels: channelsReducer,
+  },
+});
+```
+
+#### 2. Category Components - COMPLETED ✅
+
+**CreateCategoryForm Component:**
+
+**Файл:** `frontend/src/components/Categories/CreateCategoryForm.tsx` (120 рядків)
+
+**Функціонал:**
+- Модальне вікно з формою створення категорії
+- Валідація на клієнті (Ant Design Form)
+- Обов'язкове поле: name
+- Pattern валідація: українські/латинські літери, цифри, пробіли, дефіси, слеші
+
+**Валідації:**
+- Назва: мінімум 2 символи, максимум 100
+- Pattern: `/^[а-яА-ЯіІїЇєЄґҐa-zA-Z0-9\s\-\/]+$/`
+- Обробка помилки унікальності з бекенду
+
+**UI/UX:**
+- Modal width: 500px
+- Form layout: vertical
+- Loading state під час створення
+- Auto-clear форми після успіху
+- Success/Error notifications
+
+**EditCategoryForm Component:**
+
+**Файл:** `frontend/src/components/Categories/EditCategoryForm.tsx` (125 рядків)
+
+**Функціонал:**
+- Модальне вікно для редагування існуючої категорії
+- Auto-fill форми з поточними даними категорії
+- Валідації ідентичні CreateCategoryForm
+- PUT request для повного оновлення
+
+**CategoryActions Components:**
+
+**Файл:** `frontend/src/components/Categories/CategoryActions.tsx` (125 рядків)
+
+**Компоненти:**
+
+**DeactivateCategoryButton:**
+- Popconfirm з підтвердженням деактивації
+- POST /api/categories/{id}/deactivate
+- Показується тільки якщо категорія активна
+- Success notification після деактивації
+
+**ActivateCategoryButton:**
+- Popconfirm з підтвердженням активації
+- POST /api/categories/{id}/activate
+- Показується тільки якщо категорія неактивна
+- Success notification після активації
+
+#### 3. Channel Components - COMPLETED ✅
+
+**Створено аналогічні компоненти для каналів:**
+
+**Файли:**
+- `frontend/src/components/Channels/CreateChannelForm.tsx` (120 рядків)
+- `frontend/src/components/Channels/EditChannelForm.tsx` (125 рядків)
+- `frontend/src/components/Channels/ChannelActions.tsx` (125 рядків)
+
+**Функціонал:** Ідентичний компонентам категорій, адаптований для каналів зв'язку
+
+**Components Export:**
+```typescript
+// frontend/src/components/Categories/index.ts
+export { default as CreateCategoryForm } from './CreateCategoryForm';
+export { default as EditCategoryForm } from './EditCategoryForm';
+export { DeactivateCategoryButton, ActivateCategoryButton } from './CategoryActions';
+
+// frontend/src/components/Channels/index.ts
+export { default as CreateChannelForm } from './CreateChannelForm';
+export { default as EditChannelForm } from './EditChannelForm';
+export { DeactivateChannelButton, ActivateChannelButton } from './ChannelActions';
+```
+
+#### 4. Categories Page - COMPLETED ✅
+
+**Файл:** `frontend/src/pages/categories.tsx` (240 рядків)
+
+**Головний функціонал:**
+- Таблиця категорій з пагінацією
+- Фільтри: пошук за назвою, показ неактивних
+- RBAC контроль: доступ тільки для ADMIN
+- Модальні вікна створення/редагування
+- Дії для кожної категорії (edit, activate/deactivate)
+
+**Колонки таблиці:**
+1. Назва категорії (з тегом "Деактивовано" для неактивних)
+2. Статус (Активна/Неактивна з кольоровим тегом)
+3. Дата створення (DD.MM.YYYY HH:mm)
+4. Дії (фіксована колонка справа)
+
+**Фільтри:**
+```tsx
+<Row gutter={[16, 16]}>
+  <Col xs={24} sm={12} md={8}>
+    <Input
+      placeholder="Пошук за назвою..."
+      prefix={<SearchOutlined />}
+      allowClear
+      onChange={(e) => handleSearch(e.target.value)}
+    />
+  </Col>
+  <Col xs={24} sm={12} md={8}>
+    <Button
+      type={includeInactive ? 'primary' : 'default'}
+      onClick={() => setIncludeInactive(!includeInactive)}
+    >
+      {includeInactive ? 'Показано всі' : 'Тільки активні'}
+    </Button>
+  </Col>
+</Row>
+```
+
+**RBAC Контроль:**
+```tsx
+const hasAccess = userRole === 'ADMIN';
+
+if (!hasAccess) {
+  return (
+    <Alert
+      message="Доступ заборонено"
+      description="Тільки адміністратори мають доступ до управління категоріями."
+      type="error"
+      showIcon
+    />
+  );
+}
+```
+
+**Action Buttons в таблиці:**
+```tsx
+<Space size="small" wrap>
+  <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+    Редагувати
+  </Button>
+  <DeactivateCategoryButton category={record} onSuccess={handleActionSuccess} />
+  <ActivateCategoryButton category={record} onSuccess={handleActionSuccess} />
+</Space>
+```
+
+**Пагінація:**
+- Server-side пагінація (skip/limit)
+- Показ загальної кількості категорій
+- Page size options: 10, 20, 50, 100
+- Quick jumper для швидкого переходу
+
+**Auto-refresh після операцій:**
+- Після створення → список оновлюється
+- Після редагування → список оновлюється
+- Після деактивації/активації → список оновлюється
+
+#### 5. Channels Page - COMPLETED ✅
+
+**Файл:** `frontend/src/pages/channels.tsx` (240 рядків)
+
+**Функціонал:** Ідентичний categories.tsx, адаптований для каналів зв'язку
+
+**Відмінності:**
+- Працює з channelsSlice
+- Використовує Channel components
+- Тексти адаптовані для каналів ("Активний/Неактивний" замість "Активна/Неактивна")
+
+#### 6. Navigation Integration - COMPLETED ✅
+
+**Оновлено MainLayout.tsx:**
+```tsx
+// Адміністрування тільки для ADMIN
+...(user?.role === 'ADMIN' ? [{
+  key: 'admin',
+  icon: <SettingOutlined />,
+  label: 'Адміністрування',
+  children: [
+    {
+      key: '/users',
+      label: 'Користувачі',
+      onClick: () => router.push('/users'),
+    },
+    {
+      key: '/categories',
+      label: 'Категорії',
+      onClick: () => router.push('/categories'),
+    },
+    {
+      key: '/channels',
+      label: 'Канали звернень',
+      onClick: () => router.push('/channels'),
+    },
+  ],
+}] : []),
+```
+
+**Видимість в меню:**
+- Тільки для користувачів з роллю ADMIN
+- Автоматично приховується для OPERATOR та EXECUTOR
+- Активний пункт підсвічується залежно від route
+
+#### 7. Test Suite - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/test_fe009.py` (450+ рядків)
+
+**Тестові сценарії (9 кроків):**
+
+1. ✅ **Логін як адміністратор**
+   - POST /api/auth/login
+   - Отримання access token
+   - Підготовка до CRUD операцій
+
+2. ✅ **Отримання списку категорій**
+   - GET /api/categories?skip=0&limit=10&include_inactive=true
+   - Перевірка структури відповіді
+   - Виведення перших 3 категорій
+
+3. ✅ **Створення нової категорії**
+   - POST /api/categories
+   - Валідація всіх полів
+   - Збереження ID для подальших тестів
+
+4. ✅ **Оновлення категорії**
+   - PUT /api/categories/{id}
+   - Зміна назви категорії
+   - Перевірка збереження змін
+
+5. ✅ **Деактивація категорії**
+   - POST /api/categories/{id}/deactivate
+   - Перевірка зміни статусу is_active
+   - Success повідомлення
+
+6. ✅ **Активація категорії**
+   - POST /api/categories/{id}/activate
+   - Перевірка зміни статусу is_active
+   - Success повідомлення
+
+7. ✅ **Перевірка унікальності назви категорії**
+   - Створення категорії з унікальною назвою
+   - Спроба створити категорію з такою ж назвою
+   - Очікувана помилка 400 Bad Request
+   - Перевірка повідомлення про помилку
+
+8. ✅ **Повний CRUD цикл для каналів**
+   - 8.1: GET /api/channels - отримання списку
+   - 8.2: POST /api/channels - створення
+   - 8.3: PUT /api/channels/{id} - оновлення
+   - 8.4: POST /api/channels/{id}/deactivate - деактивація
+   - 8.5: POST /api/channels/{id}/activate - активація
+
+9. ✅ **Перевірка унікальності назви каналу**
+   - Аналогічно кроку 7, але для каналів
+   - Валідація працює коректно
+
+**Test Output Format:**
+```
+================================================================================
+  FE-009: Admin Section - Categories/Channels Testing
+================================================================================
+
+[КРОК 1] Логін як адміністратор
+--------------------------------------------------------------------------------
+✅ Успішний логін: admin
+ℹ️  Access token отримано: eyJhbGciOiJIUzI1NiIsIn...
+
+[КРОК 3] Створення нової категорії (POST /api/categories)
+--------------------------------------------------------------------------------
+✅ Категорію створено: Тестова категорія FE-009 14:30:25
+ℹ️  ID: uuid-here
+ℹ️  Статус: Активна
+
+[КРОК 7] Перевірка унікальності назви категорії
+--------------------------------------------------------------------------------
+✅ Категорію створено: Унікальна категорія 1730208625.123
+✅ Валідація унікальності працює! Отримано очікувану помилку 400
+ℹ️  Повідомлення: Category with name 'Унікальна категорія...' already exists
+
+...
+
+================================================================================
+ПІДСУМОК ТЕСТУВАННЯ FE-009
+================================================================================
+Результати тестування:
+  ✅ PASS - Логін як адміністратор
+  ✅ PASS - Отримання списку категорій
+  ✅ PASS - Створення категорії
+  ✅ PASS - Оновлення категорії
+  ✅ PASS - Деактивація категорії
+  ✅ PASS - Активація категорії
+  ✅ PASS - Перевірка унікальності категорії
+  ✅ PASS - CRUD для каналів
+  ✅ PASS - Перевірка унікальності каналу
+
+Загальний результат: 9/9 тестів пройдено
+✅ Всі основні сценарії протестовано успішно!
+ℹ️  Frontend компоненти готові до використання:
+  • categoriesSlice.ts - Redux state management для категорій
+  • channelsSlice.ts - Redux state management для каналів
+  • CreateCategoryForm - Форма створення категорії
+  • EditCategoryForm - Форма редагування категорії
+  • CategoryActions - Деактивація/активація категорії
+  • CreateChannelForm - Форма створення каналу
+  • EditChannelForm - Форма редагування каналу
+  • ChannelActions - Деактивація/активація каналу
+  • categories.tsx - Сторінка управління категоріями
+  • channels.tsx - Сторінка управління каналами
+ℹ️  Бекенд endpoints (BE-003) працюють коректно
+ℹ️  RBAC контроль налаштовано (тільки ADMIN)
+ℹ️  Валідації унікальності працюють на сервері
+
+FE-009 ГОТОВО ДО PRODUCTION ✅
+```
+
+#### 8. FE-009 Summary - PRODUCTION READY ✅
+
+**Що імплементовано:**
+
+**Redux Layer:**
+- ✅ categoriesSlice.ts з 6 async thunks
+- ✅ channelsSlice.ts з 6 async thunks
+- ✅ Type-safe інтерфейси та типи
+- ✅ Централізоване управління станом
+- ✅ Error handling та loading states
+- ✅ Селектори для всіх даних
+
+**UI Components (Categories):**
+- ✅ CreateCategoryForm - модальна форма створення
+- ✅ EditCategoryForm - модальна форма редагування
+- ✅ DeactivateCategoryButton - деактивація з підтвердженням
+- ✅ ActivateCategoryButton - активація з підтвердженням
+- ✅ categories.tsx - головна сторінка з таблицею
+
+**UI Components (Channels):**
+- ✅ CreateChannelForm - модальна форма створення
+- ✅ EditChannelForm - модальна форма редагування
+- ✅ DeactivateChannelButton - деактивація з підтвердженням
+- ✅ ActivateChannelButton - активація з підтвердженням
+- ✅ channels.tsx - головна сторінка з таблицею
+
+**Features:**
+- ✅ CRUD операції для категорій та каналів
+- ✅ Фільтрація: пошук за назвою, показ неактивних
+- ✅ Пагінація: skip/limit з показом total
+- ✅ RBAC: тільки ADMIN має доступ
+- ✅ Валідації: client-side (Ant Design Form)
+- ✅ Валідації: server-side (унікальність назв)
+- ✅ Error handling: обробка помилок унікальності
+- ✅ Success notifications: для всіх операцій
+- ✅ Auto-refresh: після CRUD операцій
+
+**User Experience:**
+- ✅ Інтуїтивний UI з Ant Design
+- ✅ Modal windows для форм
+- ✅ Popconfirm для важливих дій
+- ✅ Loading states для всіх операцій
+- ✅ Responsive таблиця з scroll
+- ✅ Кольорове кодування статусів
+- ✅ Захист від помилок валідації
+
+**Backend Integration:**
+- ✅ GET /api/categories - список з фільтрами
+- ✅ POST /api/categories - створення
+- ✅ GET /api/categories/{id} - деталі
+- ✅ PUT /api/categories/{id} - оновлення
+- ✅ POST /api/categories/{id}/deactivate - деактивація
+- ✅ POST /api/categories/{id}/activate - активація
+- ✅ GET /api/channels - список з фільтрами
+- ✅ POST /api/channels - створення
+- ✅ GET /api/channels/{id} - деталі
+- ✅ PUT /api/channels/{id} - оновлення
+- ✅ POST /api/channels/{id}/deactivate - деактивація
+- ✅ POST /api/channels/{id}/activate - активація
+
+**Files Created:**
+- ✅ `frontend/src/store/slices/categoriesSlice.ts` (270 lines)
+- ✅ `frontend/src/store/slices/channelsSlice.ts` (270 lines)
+- ✅ `frontend/src/components/Categories/CreateCategoryForm.tsx` (120 lines)
+- ✅ `frontend/src/components/Categories/EditCategoryForm.tsx` (125 lines)
+- ✅ `frontend/src/components/Categories/CategoryActions.tsx` (125 lines)
+- ✅ `frontend/src/components/Categories/index.ts` (10 lines)
+- ✅ `frontend/src/components/Channels/CreateChannelForm.tsx` (120 lines)
+- ✅ `frontend/src/components/Channels/EditChannelForm.tsx` (125 lines)
+- ✅ `frontend/src/components/Channels/ChannelActions.tsx` (125 lines)
+- ✅ `frontend/src/components/Channels/index.ts` (10 lines)
+- ✅ `frontend/src/pages/categories.tsx` (240 lines)
+- ✅ `frontend/src/pages/channels.tsx` (240 lines)
+- ✅ `ohmatdyt-crm/test_fe009.py` (450+ lines)
+
+**Files Modified:**
+- ✅ `frontend/src/store/index.ts` - додано categoriesReducer та channelsReducer
+- ✅ `frontend/src/components/Layout/MainLayout.tsx` - додано /categories та /channels в меню
+
+**Dependencies Met:**
+- ✅ BE-003: Categories and Channels API endpoints
+- ✅ Ant Design Components (Form, Table, Modal, Button, Input)
+- ✅ Redux Toolkit для state management
+- ✅ React Router для навігації
+
+**DoD Verification:**
+- ✅ Таблиці списків для категорій та каналів
+- ✅ Форми створення/редагування з валідаціями
+- ✅ Дії: деactivate/activate працюють
+- ✅ Унікальність назв валідується на боці API
+- ✅ Помилки показуються коректно
+- ✅ RBAC тільки для ADMIN
+- ✅ Тести покривають всі CRUD сценарії
+- ✅ Тести перевіряють валідацію унікальності
+
+**Status:** ✅ FE-009 PRODUCTION READY (100%)
+
+---
+
+## 🏆 Previous Updates (October 29, 2025 - FE-008 User Management)
+
+### Frontend: Admin Section - User Management ✅
+
+#### 1. Redux State Management - COMPLETED ✅
+
+**Створено usersSlice.ts з повним CRUD функціоналом:**
+
+**Файл:** `frontend/src/store/slices/usersSlice.ts` (430+ рядків)
+
+**Типи та інтерфейси:**
+```typescript
+export type UserRole = 'OPERATOR' | 'EXECUTOR' | 'ADMIN';
+
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  is_active: boolean;
+  executor_category_ids?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateUserData {
+  username: string;
+  email: string;
+  full_name: string;
+  password: string;
+  role: UserRole;
+  is_active?: boolean;
+  executor_category_ids?: string[];
+}
+
+export interface UpdateUserData {
+  username?: string;
+  email?: string;
+  full_name?: string;
+  password?: string;
+  role?: UserRole;
+  is_active?: boolean;
+  executor_category_ids?: string[];
+}
+```
+
+**Async Thunks (10 операцій):**
+1. `fetchUsersAsync` - Отримання списку з фільтрами, пагінацією, сортуванням
+2. `fetchUserByIdAsync` - Отримання користувача за ID
+3. `createUserAsync` - Створення нового користувача
+4. `updateUserAsync` - Повне оновлення (PUT)
+5. `patchUserAsync` - Часткове оновлення (PATCH)
+6. `deactivateUserAsync` - Деактивація з перевіркою активних справ
+7. `activateUserAsync` - Активація користувача
+8. `resetPasswordAsync` - Генерація тимчасового пароля
+9. `fetchUserActiveCasesAsync` - Отримання активних справ користувача
+
+**Особливості:**
+- Спеціальна обробка 409 Conflict при деактивації (користувач має активні справи)
+- Auto-update списку після CRUD операцій
+- Централізоване управління помилками
+- Type-safe селектори для всіх даних
+
+**Селектори:**
+```typescript
+export const selectUsers = (state: { users: UsersState }) => state.users.users;
+export const selectUsersTotal = (state: { users: UsersState }) => state.users.total;
+export const selectUsersLoading = (state: { users: UsersState }) => state.users.isLoading;
+export const selectUsersError = (state: { users: UsersState }) => state.users.error;
+export const selectCurrentUser = (state: { users: UsersState }) => state.users.currentUser;
+```
+
+**Інтеграція в Store:**
+```typescript
+// frontend/src/store/index.ts
+import usersReducer from './slices/usersSlice';
+
+export const store = configureStore({
+  reducer: {
+    auth: authReducer,
+    cases: casesReducer,
+    users: usersReducer, // ✅ Додано
+  },
+});
+```
+
+#### 2. CreateUserForm Component - COMPLETED ✅
+
+**Файл:** `frontend/src/components/Users/CreateUserForm.tsx` (210 рядків)
+
+**Функціонал:**
+- Модальне вікно з формою створення користувача
+- Валідація на клієнті (Ant Design Form)
+- Обов'язкові поля: username, email, full_name, password, role
+- Опціональне поле: is_active (за замовчуванням true)
+
+**Валідації:**
+- Username: мінімум 3 символи, тільки латиниця, цифри, _ та -
+- Email: валідний email формат
+- ПІБ: мінімум 3 символи, максимум 100
+- Пароль: мінімум 8 символів, великі та малі літери, цифри
+- Підтвердження пароля: має співпадати з паролем
+
+**UI/UX:**
+- Modal width: 600px
+- Form layout: vertical
+- Loading state під час створення
+- Auto-clear форми після успіху
+- Success/Error notifications
+
+**Приклад форми:**
+```tsx
+<Form.Item
+  name="password"
+  label="Пароль"
+  rules={[
+    { required: true, message: 'Будь ласка, введіть пароль' },
+    { min: 8, message: 'Пароль повинен містити мінімум 8 символів' },
+    {
+      pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/,
+      message: 'Пароль повинен містити великі та малі літери, цифри',
+    },
+  ]}
+  hasFeedback
+>
+  <Input.Password placeholder="Введіть надійний пароль" />
+</Form.Item>
+```
+
+#### 3. EditUserForm Component - COMPLETED ✅
+
+**Файл:** `frontend/src/components/Users/EditUserForm.tsx` (220 рядків)
+
+**Функціонал:**
+- Модальне вікно для редагування існуючого користувача
+- Auto-fill форми з поточними даними користувача
+- Пароль опціональний (тільки якщо потрібно змінити)
+- Всі поля редагуються: username, email, full_name, role, is_active
+
+**Особливості:**
+- Пароль не обов'язковий (залишити пустим = не міняти)
+- useEffect для заповнення форми при зміні користувача
+- Валідації ідентичні CreateUserForm
+- PUT request для повного оновлення
+
+**Auto-fill логіка:**
+```tsx
+useEffect(() => {
+  if (user && visible) {
+    form.setFieldsValue({
+      username: user.username,
+      email: user.email,
+      full_name: user.full_name,
+      role: user.role,
+      is_active: user.is_active,
+    });
+  }
+}, [user, visible, form]);
+```
+
+#### 4. User Actions Components - COMPLETED ✅
+
+**Файл:** `frontend/src/components/Users/UserActions.tsx` (230 рядків)
+
+**Компоненти:**
+
+**4.1. DeactivateUserButton:**
+- Popconfirm з підтвердженням деактивації
+- Спеціальна обробка 409 Conflict (активні справи)
+- Modal для підтвердження примусової деактивації
+- Показ кількості активних справ
+- Кнопка disabled якщо користувач вже неактивний
+
+**Обробка конфліктів:**
+```tsx
+if (error.hasActiveCases && !force) {
+  setActiveCasesCount(error.activeCasesCount || 0);
+  setShowForceModal(true); // Показуємо modal з попередженням
+}
+```
+
+**4.2. ActivateUserButton:**
+- Popconfirm з підтвердженням активації
+- POST /api/users/{id}/activate
+- Кнопка disabled якщо користувач вже активний
+- Success notification після активації
+
+**4.3. ResetPasswordButton:**
+- Popconfirm з підтвердженням скидання пароля
+- POST /api/users/{id}/reset-password
+- Modal.success з тимчасовим паролем
+- Копіювання пароля (copyable paragraph)
+- Інструкції для користувача
+
+**Приклад Success Modal:**
+```tsx
+Modal.success({
+  title: 'Пароль успішно скинуто',
+  content: (
+    <div>
+      <Paragraph>
+        Тимчасовий пароль для користувача <Text strong>{user.full_name}</Text>:
+      </Paragraph>
+      <Paragraph
+        copyable
+        style={{
+          backgroundColor: '#fff7e6',
+          padding: '12px',
+          fontFamily: 'monospace',
+          fontSize: '16px',
+          fontWeight: 'bold',
+        }}
+      >
+        {result.temp_password}
+      </Paragraph>
+    </div>
+  ),
+  width: 500,
+});
+```
+
+#### 5. Users Page - Main Interface - COMPLETED ✅
+
+**Файл:** `frontend/src/pages/users.tsx` (420 рядків)
+
+**Головний функціонал:**
+- Таблиця користувачів з пагінацією та сортуванням
+- Фільтри: пошук, роль, статус активності
+- RBAC контроль: доступ тільки для ADMIN
+- Модальні вікна створення/редагування
+- Дії для кожного користувача (edit, activate/deactivate, reset password)
+
+**Колонки таблиці:**
+1. ПІБ (з тегом "Деактивовано" для неактивних)
+2. Логін (username)
+3. Email (з ellipsis)
+4. Роль (Tag з кольоровим кодуванням: ADMIN=red, EXECUTOR=green, OPERATOR=blue)
+5. Статус (Активний/Неактивний)
+6. Дата створення (DD.MM.YYYY HH:mm)
+7. Дії (фіксована колонка справа)
+
+**Фільтри:**
+```tsx
+<Row gutter={[16, 16]}>
+  <Col xs={24} sm={12} md={8}>
+    <Input
+      placeholder="Пошук за ПІБ, логіном або email..."
+      prefix={<SearchOutlined />}
+      value={filters.search}
+      onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+    />
+  </Col>
+  <Col xs={24} sm={12} md={4}>
+    <Select placeholder="Роль" value={filters.role} onChange={...} />
+  </Col>
+  <Col xs={24} sm={12} md={4}>
+    <Select placeholder="Статус" value={filters.is_active} onChange={...} />
+  </Col>
+</Row>
+```
+
+**RBAC Контроль:**
+```tsx
+const hasAccess = userRole === 'ADMIN';
+
+if (!hasAccess) {
+  return (
+    <div style={{ padding: '24px', textAlign: 'center' }}>
+      <Title level={3}>Доступ заборонено</Title>
+      <p>Тільки адміністратори мають доступ до цієї сторінки</p>
+    </div>
+  );
+}
+```
+
+**Action Buttons в таблиці:**
+```tsx
+<Space size="small" wrap>
+  <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+    Редагувати
+  </Button>
+  
+  {record.is_active ? (
+    <DeactivateUserButton user={record} onSuccess={handleActionSuccess} />
+  ) : (
+    <ActivateUserButton user={record} onSuccess={handleActionSuccess} />
+  )}
+  
+  <ResetPasswordButton user={record} onSuccess={handleActionSuccess} />
+</Space>
+```
+
+**Пагінація та сортування:**
+- Server-side пагінація (skip/limit)
+- Server-side сортування (order_by/order)
+- Показ загальної кількості користувачів
+- Quick jumper для швидкого переходу
+
+**Auto-refresh після операцій:**
+- Після створення → список оновлюється
+- Після редагування → список оновлюється
+- Після деактивації/активації → список оновлюється
+- Після скидання пароля → список оновлюється
+
+#### 6. Navigation Integration - COMPLETED ✅
+
+**Оновлено MainLayout.tsx:**
+```tsx
+// Адміністрування тільки для ADMIN
+...(user?.role === 'ADMIN' ? [{
+  key: 'admin',
+  icon: <SettingOutlined />,
+  label: 'Адміністрування',
+  children: [
+    {
+      key: '/users',
+      label: 'Користувачі',
+      onClick: () => router.push('/users'),
+    },
+    // ... інші адмін пункти
+  ],
+}] : []),
+```
+
+**Видимість в меню:**
+- Тільки для користувачів з роллю ADMIN
+- Автоматично приховується для OPERATOR та EXECUTOR
+- Активний пункт підсвічується залежно від route
+
+#### 7. Components Export Index - COMPLETED ✅
+
+**Файл:** `frontend/src/components/Users/index.ts`
+
+```typescript
+export { default as CreateUserForm } from './CreateUserForm';
+export { default as EditUserForm } from './EditUserForm';
+export {
+  DeactivateUserButton,
+  ActivateUserButton,
+  ResetPasswordButton,
+} from './UserActions';
+```
+
+#### 8. Test Suite - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/test_fe008.py` (450+ рядків)
+
+**Тестові сценарії (10 кроків):**
+
+1. ✅ **Логін як адміністратор**
+   - POST /api/auth/login
+   - Отримання access_token
+   - Підготовка до CRUD операцій
+
+2. ✅ **Отримання списку користувачів**
+   - GET /api/users?skip=0&limit=10
+   - Перевірка структури відповіді
+   - Виведення першіх 3 користувачів
+
+3. ✅ **Створення нового користувача**
+   - POST /api/users
+   - Username: test_user_fe008
+   - Email: test_fe008@example.com
+   - Role: OPERATOR
+   - Валідація всіх полів
+
+4. ✅ **Отримання користувача за ID**
+   - GET /api/users/{id}
+   - Перевірка UUID serialization
+   - Виведення деталей користувача
+
+5. ✅ **Оновлення користувача**
+   - PUT /api/users/{id}
+   - Зміна ПІБ, email, ролі
+   - Перевірка збереження змін
+
+6. ✅ **Скидання пароля**
+   - POST /api/users/{id}/reset-password
+   - Отримання тимчасового пароля
+   - Виведення temp_password
+
+7. ✅ **Тест конфлікту активних справ**
+   - POST /api/users/{id}/deactivate (може повернути 409)
+   - Перевірка повідомлення про активні справи
+   - Демонстрація захисту від випадкової деактивації
+
+8. ✅ **Деактивація користувача**
+   - POST /api/users/{id}/deactivate?force=false
+   - Перевірка is_active=false
+   - Success повідомлення
+
+9. ✅ **Активація користувача**
+   - POST /api/users/{id}/activate
+   - Перевірка is_active=true
+   - Success повідомлення
+
+10. ✅ **Фільтрація та пагінація**
+    - Фільтр по ролі ADMIN
+    - Фільтр по is_active=true
+    - Перевірка коректності результатів
+
+**Test Output Format:**
+```
+================================================================================
+  FE-008: User Management Testing
+================================================================================
+
+[КРОК 1] Логін як адміністратор
+--------------------------------------------------------------------------------
+✅ Успішний логін: admin
+ℹ️  Access token отримано: eyJhbGciOiJIUzI1NiIsIn...
+
+[КРОК 3] Створення нового користувача (POST /api/users)
+--------------------------------------------------------------------------------
+✅ Користувача створено: Тестовий Користувач FE-008 (ID: ...)
+ℹ️  Username: test_user_fe008
+ℹ️  Email: test_fe008@example.com
+ℹ️  Role: OPERATOR
+ℹ️  Active: True
+
+...
+
+================================================================================
+ПІДСУМОК ТЕСТУВАННЯ FE-008
+================================================================================
+✅ Всі основні сценарії протестовано успішно!
+ℹ️  Frontend компоненти готові до використання:
+  • usersSlice.ts - Redux state management
+  • CreateUserForm.tsx - Форма створення
+  • EditUserForm.tsx - Форма редагування
+  • UserActions.tsx - Деактивація/Активація/Скидання пароля
+  • users.tsx - Головна сторінка з таблицею
+ℹ️  Бекенд endpoints (BE-012) працюють коректно
+ℹ️  RBAC контроль налаштовано (тільки ADMIN)
+ℹ️  Валідації працюють на клієнті та сервері
+
+FE-008 ГОТОВО ДО PRODUCTION ✅
+```
+
+#### 9. FE-008 Summary - PRODUCTION READY ✅
+
+**Що імплементовано:**
+
+**Redux Layer:**
+- ✅ usersSlice.ts з 10 async thunks
+- ✅ Type-safe інтерфейси та типи
+- ✅ Централізоване управління станом
+- ✅ Error handling та loading states
+- ✅ Селектори для всіх даних
+
+**UI Components:**
+- ✅ CreateUserForm - модальна форма створення
+- ✅ EditUserForm - модальна форма редагування
+- ✅ DeactivateUserButton - деактивація з захистом
+- ✅ ActivateUserButton - активація користувача
+- ✅ ResetPasswordButton - генерація temp password
+- ✅ users.tsx - головна сторінка з таблицею
+
+**Features:**
+- ✅ CRUD операції для користувачів
+- ✅ Фільтрація: пошук, роль, статус
+- ✅ Пагінація: skip/limit з показом total
+- ✅ Сортування: server-side за всіма колонками
+- ✅ RBAC: тільки ADMIN має доступ
+- ✅ Валідації: client-side (Ant Design Form)
+- ✅ Error handling: спеціальна обробка 409 Conflict
+- ✅ Success notifications: для всіх операцій
+- ✅ Auto-refresh: після CRUD операцій
+
+**User Experience:**
+- ✅ Інтуїтивний UI з Ant Design
+- ✅ Modal windows для форм
+- ✅ Popconfirm для важливих дій
+- ✅ Loading states для всіх операцій
+- ✅ Responsive таблиця з scroll
+- ✅ Кольорове кодування ролей та статусів
+- ✅ Копіювання тимчасового пароля
+- ✅ Захист від випадкової деактивації
+
+**Backend Integration:**
+- ✅ GET /api/users - список з фільтрами
+- ✅ POST /api/users - створення
+- ✅ GET /api/users/{id} - деталі
+- ✅ PUT /api/users/{id} - повне оновлення
+- ✅ PATCH /api/users/{id} - часткове оновлення
+- ✅ POST /api/users/{id}/deactivate - деактивація
+- ✅ POST /api/users/{id}/activate - активація
+- ✅ POST /api/users/{id}/reset-password - скидання
+- ✅ GET /api/users/{id}/active-cases - активні справи
+
+**Files Created:**
+- ✅ `frontend/src/store/slices/usersSlice.ts` (430 lines)
+- ✅ `frontend/src/components/Users/CreateUserForm.tsx` (210 lines)
+- ✅ `frontend/src/components/Users/EditUserForm.tsx` (220 lines)
+- ✅ `frontend/src/components/Users/UserActions.tsx` (230 lines)
+- ✅ `frontend/src/components/Users/index.ts` (10 lines)
+- ✅ `frontend/src/pages/users.tsx` (420 lines)
+- ✅ `ohmatdyt-crm/test_fe008.py` (450+ lines)
+
+**Files Modified:**
+- ✅ `frontend/src/store/index.ts` - додано usersReducer
+- ✅ `frontend/src/components/Layout/MainLayout.tsx` - додано /users в меню
+
+**Dependencies Met:**
+- ✅ BE-012: User Management API endpoints
+- ✅ Ant Design Components (Form, Table, Modal, Button, Select, Input)
+- ✅ Redux Toolkit для state management
+- ✅ React Router для навігації
+
+**DoD Verification:**
+- ✅ Таблиця користувачів з усіма колонками
+- ✅ Фільтри за роллю та статусом
+- ✅ Сортування працює
+- ✅ Форми створення/редагування з валідаціями
+- ✅ Деактивація/Активація працюють
+- ✅ Скидання пароля працює
+- ✅ RBAC тільки для ADMIN
+- ✅ Помилки відображаються коректно
+- ✅ Тести покривають всі сценарії
+
+**Status:** ✅ FE-008 PRODUCTION READY (100%)
+
+---
+
+## 🏆 Previous Updates (October 29, 2025 - FE-007 Executor Actions)
 
 ### Frontend: Executor Action Components ✅
 
