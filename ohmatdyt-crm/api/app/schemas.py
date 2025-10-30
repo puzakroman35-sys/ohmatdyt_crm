@@ -458,6 +458,21 @@ class CaseStatusChangeRequest(BaseModel):
         return v
 
 
+# ==================== BE-017: Admin Case Management Schemas ====================
+
+class CaseAssignmentRequest(BaseModel):
+    """
+    Schema for assigning/unassigning executor to a case (ADMIN only).
+    
+    BE-017: Used by ADMIN to assign or unassign responsible executor.
+    - assigned_to_id: UUID of executor to assign, or null to unassign
+    """
+    assigned_to_id: Optional[str] = Field(
+        None,
+        description="UUID of executor to assign (EXECUTOR or ADMIN role), or null to unassign"
+    )
+
+
 # ==================== User Management Schemas (ADMIN) ====================
 
 class ResetPasswordResponse(BaseModel):

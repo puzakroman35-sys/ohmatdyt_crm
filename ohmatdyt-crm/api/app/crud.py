@@ -1554,19 +1554,22 @@ def change_case_status(
     if not executor:
         raise ValueError(f"Executor with id '{executor_id}' not found")
     
-    # Only responsible executor can change status
-    if db_case.responsible_id != executor_id:
-        raise ValueError(
-            f"Only the responsible executor can change case status. "
-            f"Current responsible: {db_case.responsible_id}, "
-            f"Requesting user: {executor_id}"
-        )
-    
     # Validate executor role
     if executor.role not in [models.UserRole.EXECUTOR, models.UserRole.ADMIN]:
         raise ValueError(
             f"Only EXECUTOR or ADMIN can change case status. "
             f"Current role: {executor.role.value}"
+        )
+    
+    # BE-017: ADMIN can change status without responsible check
+    is_admin = executor.role == models.UserRole.ADMIN
+    
+    # Only responsible executor can change status (unless ADMIN)
+    if not is_admin and db_case.responsible_id != executor_id:
+        raise ValueError(
+            f"Only the responsible executor can change case status. "
+            f"Current responsible: {db_case.responsible_id}, "
+            f"Requesting user: {executor_id}"
         )
     
     # Validate status transition
@@ -1588,20 +1591,32 @@ def change_case_status(
         ]
     }
     
-    # Check if current status allows transitions
-    if current_status not in valid_transitions:
-        raise ValueError(
-            f"Cannot change status from {current_status.value}. "
-            f"Status changes are only allowed from IN_PROGRESS or NEEDS_INFO."
-        )
-    
-    # Check if target status is valid for current status
-    if to_status not in valid_transitions[current_status]:
-        allowed = ", ".join([s.value for s in valid_transitions[current_status]])
-        raise ValueError(
-            f"Invalid status transition: {current_status.value} -> {to_status.value}. "
-            f"Allowed transitions: {allowed}"
-        )
+    # BE-017: ADMIN can change from any status (including NEW, DONE, REJECTED)
+    if is_admin:
+        # ADMIN has no transition restrictions, but validate target status is valid
+        if to_status not in [
+            models.CaseStatus.NEW,
+            models.CaseStatus.IN_PROGRESS,
+            models.CaseStatus.NEEDS_INFO,
+            models.CaseStatus.REJECTED,
+            models.CaseStatus.DONE
+        ]:
+            raise ValueError(f"Invalid target status: {to_status.value}")
+    else:
+        # Check if current status allows transitions (for EXECUTOR)
+        if current_status not in valid_transitions:
+            raise ValueError(
+                f"Cannot change status from {current_status.value}. "
+                f"Status changes are only allowed from IN_PROGRESS or NEEDS_INFO."
+            )
+        
+        # Check if target status is valid for current status
+        if to_status not in valid_transitions[current_status]:
+            allowed = ", ".join([s.value for s in valid_transitions[current_status]])
+            raise ValueError(
+                f"Invalid status transition: {current_status.value} -> {to_status.value}. "
+                f"Allowed transitions: {allowed}"
+            )
     
     # Validate comment
     if not comment_text or len(comment_text.strip()) < 10:
@@ -1634,6 +1649,103 @@ def change_case_status(
     db.add(db_comment)
     db.commit()
     db.refresh(db_comment)
+    
+    return db_case
+
+
+def assign_case_executor(
+    db: Session,
+    case_id: UUID,
+    executor_id: Optional[UUID],
+    admin_id: UUID
+) -> models.Case:
+    """
+    Assign or unassign executor to a case (ADMIN only).
+    
+    BE-017: This function allows ADMIN to manage case assignments:
+    - Assign executor: Sets responsible_id and changes status to IN_PROGRESS
+    - Unassign executor: Clears responsible_id and changes status to NEW
+    
+    Business rules:
+    - executor_id can be None to unassign
+    - Assigned user must be EXECUTOR or ADMIN role
+    - Assigned user must be active
+    - When assigning: status -> IN_PROGRESS (if was NEW)
+    - When unassigning: status -> NEW
+    - Assignment changes are logged in status history
+    
+    Args:
+        db: Database session
+        case_id: Case UUID
+        executor_id: UUID of executor to assign, or None to unassign
+        admin_id: UUID of admin performing the action
+        
+    Returns:
+        Updated case model with new assignment
+        
+    Raises:
+        ValueError: If validation fails (case not found, invalid executor, etc.)
+    """
+    # Get case
+    db_case = get_case(db, case_id)
+    if not db_case:
+        raise ValueError(f"Case with id '{case_id}' not found")
+    
+    old_status = db_case.status
+    old_responsible = db_case.responsible_id
+    
+    if executor_id is None:
+        # Unassign: Clear responsible and set status to NEW
+        db_case.responsible_id = None
+        db_case.status = models.CaseStatus.NEW
+        
+        # Create status history if status changed
+        if old_status != models.CaseStatus.NEW:
+            db.commit()
+            db.refresh(db_case)
+            create_status_history(
+                db=db,
+                case_id=case_id,
+                old_status=old_status,
+                new_status=models.CaseStatus.NEW,
+                changed_by_id=admin_id
+            )
+    else:
+        # Assign: Validate executor and set responsible
+        executor = get_user(db, executor_id)
+        if not executor:
+            raise ValueError(f"Executor with id '{executor_id}' not found")
+        
+        if executor.role not in [models.UserRole.EXECUTOR, models.UserRole.ADMIN]:
+            raise ValueError(
+                f"User '{executor.username}' cannot be assigned as responsible. "
+                f"Must be EXECUTOR or ADMIN role. Current role: {executor.role.value}"
+            )
+        
+        if not executor.is_active:
+            raise ValueError(f"Executor '{executor.username}' is not active")
+        
+        # Set responsible and update status
+        db_case.responsible_id = executor_id
+        
+        # If case was NEW, change to IN_PROGRESS
+        if db_case.status == models.CaseStatus.NEW:
+            db_case.status = models.CaseStatus.IN_PROGRESS
+        
+        # Create status history if status changed
+        if old_status != db_case.status:
+            db.commit()
+            db.refresh(db_case)
+            create_status_history(
+                db=db,
+                case_id=case_id,
+                old_status=old_status,
+                new_status=db_case.status,
+                changed_by_id=admin_id
+            )
+    
+    db.commit()
+    db.refresh(db_case)
     
     return db_case
 

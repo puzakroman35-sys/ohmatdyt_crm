@@ -1185,3 +1185,153 @@ async def change_case_status(
         updated_at=db_case.updated_at
     )
 
+
+# ==================== BE-017: Admin Case Management Endpoints ====================
+
+@router.patch("/{case_id}", response_model=schemas.CaseResponse)
+async def update_case_fields(
+    case_id: UUID,
+    case_update: schemas.CaseUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
+    """
+    Update case fields (ADMIN only).
+    
+    BE-017: This endpoint allows ADMIN to edit all case fields including:
+    - category_id: Change case category
+    - subcategory: Change subcategory
+    - channel_id: Change communication channel
+    - applicant_name: Edit applicant name
+    - applicant_phone: Edit phone number
+    - applicant_email: Edit email address
+    - summary: Edit case description
+    
+    Business rules:
+    - Only ADMIN role has access
+    - All validations apply (category/channel existence, active status, email format, etc.)
+    - Changes are logged in case history
+    - Returns full updated case information
+    
+    RBAC:
+    - ADMIN: Full access to edit any case
+    - EXECUTOR/OPERATOR: 403 Forbidden
+    
+    Returns:
+    - Updated case with all fields
+    
+    Errors:
+    - 400: Validation error (invalid category, channel, email format, etc.)
+    - 403: User is not ADMIN
+    - 404: Case not found
+    """
+    try:
+        db_case = crud.update_case(
+            db=db,
+            case_id=case_id,
+            case_update=case_update
+        )
+        
+        if not db_case:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Case with id '{case_id}' not found"
+            )
+        
+        return schemas.CaseResponse(
+            id=str(db_case.id),
+            public_id=db_case.public_id,
+            category_id=str(db_case.category_id),
+            channel_id=str(db_case.channel_id),
+            subcategory=db_case.subcategory,
+            applicant_name=db_case.applicant_name,
+            applicant_phone=db_case.applicant_phone,
+            applicant_email=db_case.applicant_email,
+            summary=db_case.summary,
+            status=db_case.status,
+            author_id=str(db_case.author_id),
+            responsible_id=str(db_case.responsible_id) if db_case.responsible_id else None,
+            created_at=db_case.created_at,
+            updated_at=db_case.updated_at
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.patch("/{case_id}/assign", response_model=schemas.CaseResponse)
+async def assign_case_executor(
+    case_id: UUID,
+    assignment: schemas.CaseAssignmentRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
+    """
+    Assign or unassign executor to a case (ADMIN only).
+    
+    BE-017: This endpoint allows ADMIN to manage case assignments:
+    - Assign executor: Sets responsible_id and changes status to IN_PROGRESS
+    - Unassign executor: Clears responsible_id and changes status back to NEW
+    
+    Business rules:
+    - Only ADMIN role has access
+    - Assigned user must be EXECUTOR or ADMIN
+    - Assigned user must be active
+    - When assigning: status -> IN_PROGRESS (if not already)
+    - When unassigning (null): status -> NEW
+    - Assignment changes are logged in case history
+    
+    Request body:
+    - assigned_to_id: UUID of executor to assign, or null to unassign
+    
+    RBAC:
+    - ADMIN: Full access to assign/unassign any case
+    - EXECUTOR/OPERATOR: 403 Forbidden
+    
+    Returns:
+    - Updated case with new assignment and status
+    
+    Errors:
+    - 400: Validation error (invalid user, not an executor, inactive user)
+    - 403: User is not ADMIN
+    - 404: Case not found
+    """
+    try:
+        db_case = crud.assign_case_executor(
+            db=db,
+            case_id=case_id,
+            executor_id=assignment.assigned_to_id,
+            admin_id=current_user.id
+        )
+        
+        if not db_case:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Case with id '{case_id}' not found"
+            )
+        
+        return schemas.CaseResponse(
+            id=str(db_case.id),
+            public_id=db_case.public_id,
+            category_id=str(db_case.category_id),
+            channel_id=str(db_case.channel_id),
+            subcategory=db_case.subcategory,
+            applicant_name=db_case.applicant_name,
+            applicant_phone=db_case.applicant_phone,
+            applicant_email=db_case.applicant_email,
+            summary=db_case.summary,
+            status=db_case.status,
+            author_id=str(db_case.author_id),
+            responsible_id=str(db_case.responsible_id) if db_case.responsible_id else None,
+            created_at=db_case.created_at,
+            updated_at=db_case.updated_at
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
