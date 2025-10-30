@@ -74,3 +74,10 @@ yarn-error.log*
 # OS
 Thumbs.db
 .DS_Store
+
+# INF-003: SSL certificates and Let's Encrypt data
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt
+certbot/conf/
+certbot/www/

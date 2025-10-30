@@ -1,0 +1,6 @@
+# This directory stores SSL certificates
+# Files in this directory are ignored by git for security reasons
+# 
+# Generate certificates:
+#   - Self-signed: ./generate-ssl-certs.sh
+#   - Let's Encrypt: ./setup-letsencrypt.sh
