@@ -2387,3 +2387,270 @@ def get_top_categories(
         'top_categories': top_categories,
         'limit': limit
     }
+
+
+def get_executor_cases(
+    db: Session,
+    executor_id: UUID,
+    status: Optional[models.CaseStatus] = None,
+    category_id: Optional[UUID] = None,
+    channel_id: Optional[UUID] = None,
+    public_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    overdue: Optional[bool] = None,
+    order_by: Optional[str] = "-created_at",
+    skip: int = 0,
+    limit: int = 50,
+    # BE-201: Extended filters
+    subcategory: Optional[str] = None,
+    applicant_name: Optional[str] = None,
+    applicant_phone: Optional[str] = None,
+    applicant_email: Optional[str] = None,
+    updated_date_from: Optional[str] = None,
+    updated_date_to: Optional[str] = None,
+    statuses: Optional[list[models.CaseStatus]] = None,
+    category_ids: Optional[list[UUID]] = None,
+    channel_ids: Optional[list[UUID]] = None
+) -> tuple[list[models.Case], int]:
+    """
+    Get cases for EXECUTOR role according to BE-016 rules.
+    
+    Executor sees:
+    1. All cases with status NEW (available to take)
+    2. All cases where executor is assigned (responsible_id = executor_id)
+    
+    Args:
+        db: Database session
+        executor_id: ID of the executor user
+        status: Filter by case status
+        category_id: Filter by category
+        channel_id: Filter by channel
+        public_id: Filter by 6-digit public ID
+        date_from: Filter by created date from (ISO format)
+        date_to: Filter by created date to (ISO format)
+        overdue: Filter overdue cases
+        order_by: Sort field (prefix with - for descending)
+        skip: Number of records to skip (pagination)
+        limit: Maximum number of records to return
+        
+        # BE-201: Extended filters
+        subcategory: Filter by subcategory
+        applicant_name: Filter by applicant name (LIKE search)
+        applicant_phone: Filter by applicant phone (LIKE search)
+        applicant_email: Filter by applicant email (LIKE search)
+        updated_date_from: Filter by updated date from
+        updated_date_to: Filter by updated date to
+        statuses: Filter by multiple statuses
+        category_ids: Filter by multiple categories
+        channel_ids: Filter by multiple channels
+        
+    Returns:
+        Tuple of (list of cases, total count)
+    """
+    from datetime import datetime
+    from sqlalchemy import or_, func, and_
+    
+    # Build base query with joins
+    query = select(models.Case).options(
+        joinedload(models.Case.category),
+        joinedload(models.Case.channel),
+        joinedload(models.Case.responsible)
+    )
+    
+    # BE-016: EXECUTOR sees NEW cases OR assigned cases
+    # This is the main filter (OR condition)
+    executor_filter = or_(
+        models.Case.status == models.CaseStatus.NEW,
+        models.Case.responsible_id == executor_id
+    )
+    query = query.where(executor_filter)
+    
+    # Apply additional filters (AND logic with executor_filter)
+    # Single value filters (backward compatibility)
+    if status:
+        query = query.where(models.Case.status == status)
+    if category_id:
+        query = query.where(models.Case.category_id == category_id)
+    if channel_id:
+        query = query.where(models.Case.channel_id == channel_id)
+    if public_id:
+        query = query.where(models.Case.public_id == public_id)
+    
+    # BE-201: Multiple value filters (OR within the list, AND with other filters)
+    if statuses and len(statuses) > 0:
+        query = query.where(models.Case.status.in_(statuses))
+    if category_ids and len(category_ids) > 0:
+        query = query.where(models.Case.category_id.in_(category_ids))
+    if channel_ids and len(channel_ids) > 0:
+        query = query.where(models.Case.channel_id.in_(channel_ids))
+    
+    # BE-201: Subcategory filter
+    if subcategory:
+        if '%' in subcategory:
+            query = query.where(models.Case.subcategory.like(subcategory))
+        else:
+            query = query.where(models.Case.subcategory == subcategory)
+    
+    # BE-201: Applicant filters (LIKE search, case-insensitive)
+    if applicant_name:
+        query = query.where(models.Case.applicant_name.ilike(f"%{applicant_name}%"))
+    if applicant_phone:
+        query = query.where(models.Case.applicant_phone.like(f"%{applicant_phone}%"))
+    if applicant_email:
+        query = query.where(models.Case.applicant_email.ilike(f"%{applicant_email}%"))
+    
+    # Date range filters (created_at)
+    if date_from:
+        try:
+            date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+            query = query.where(models.Case.created_at >= date_from_dt)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            query = query.where(models.Case.created_at <= date_to_dt)
+        except ValueError:
+            pass
+    
+    # BE-201: Date range filters (updated_at)
+    if updated_date_from:
+        try:
+            updated_from_dt = datetime.fromisoformat(updated_date_from.replace('Z', '+00:00'))
+            query = query.where(models.Case.updated_at >= updated_from_dt)
+        except ValueError:
+            pass
+    
+    if updated_date_to:
+        try:
+            updated_to_dt = datetime.fromisoformat(updated_date_to.replace('Z', '+00:00'))
+            query = query.where(models.Case.updated_at <= updated_to_dt)
+        except ValueError:
+            pass
+    
+    # Overdue filter
+    if overdue is not None:
+        from datetime import timedelta
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        
+        if overdue:
+            query = query.where(
+                models.Case.created_at < seven_days_ago,
+                models.Case.status.in_([models.CaseStatus.NEW, models.CaseStatus.IN_PROGRESS])
+            )
+        else:
+            from sqlalchemy import or_ as or_clause
+            query = query.where(
+                or_clause(
+                    models.Case.created_at >= seven_days_ago,
+                    models.Case.status.in_([models.CaseStatus.DONE, models.CaseStatus.REJECTED])
+                )
+            )
+    
+    # Count query with same filters
+    count_query = select(func.count()).select_from(models.Case).where(executor_filter)
+    
+    # Re-apply all filters for counting
+    if status:
+        count_query = count_query.where(models.Case.status == status)
+    if category_id:
+        count_query = count_query.where(models.Case.category_id == category_id)
+    if channel_id:
+        count_query = count_query.where(models.Case.channel_id == channel_id)
+    if public_id:
+        count_query = count_query.where(models.Case.public_id == public_id)
+    
+    # BE-201: Multiple value filters
+    if statuses and len(statuses) > 0:
+        count_query = count_query.where(models.Case.status.in_(statuses))
+    if category_ids and len(category_ids) > 0:
+        count_query = count_query.where(models.Case.category_id.in_(category_ids))
+    if channel_ids and len(channel_ids) > 0:
+        count_query = count_query.where(models.Case.channel_id.in_(channel_ids))
+    
+    # BE-201: Subcategory filter
+    if subcategory:
+        if '%' in subcategory:
+            count_query = count_query.where(models.Case.subcategory.like(subcategory))
+        else:
+            count_query = count_query.where(models.Case.subcategory == subcategory)
+    
+    # BE-201: Applicant filters
+    if applicant_name:
+        count_query = count_query.where(models.Case.applicant_name.ilike(f"%{applicant_name}%"))
+    if applicant_phone:
+        count_query = count_query.where(models.Case.applicant_phone.like(f"%{applicant_phone}%"))
+    if applicant_email:
+        count_query = count_query.where(models.Case.applicant_email.ilike(f"%{applicant_email}%"))
+    
+    # Date range filters (created_at) for count
+    if date_from:
+        try:
+            date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+            count_query = count_query.where(models.Case.created_at >= date_from_dt)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            count_query = count_query.where(models.Case.created_at <= date_to_dt)
+        except ValueError:
+            pass
+    
+    # BE-201: Date range filters (updated_at) for count
+    if updated_date_from:
+        try:
+            updated_from_dt = datetime.fromisoformat(updated_date_from.replace('Z', '+00:00'))
+            count_query = count_query.where(models.Case.updated_at >= updated_from_dt)
+        except ValueError:
+            pass
+    
+    if updated_date_to:
+        try:
+            updated_to_dt = datetime.fromisoformat(updated_date_to.replace('Z', '+00:00'))
+            count_query = count_query.where(models.Case.updated_at <= updated_to_dt)
+        except ValueError:
+            pass
+    
+    # Overdue filter for count
+    if overdue is not None:
+        from datetime import timedelta
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        
+        if overdue:
+            count_query = count_query.where(
+                models.Case.created_at < seven_days_ago,
+                models.Case.status.in_([models.CaseStatus.NEW, models.CaseStatus.IN_PROGRESS])
+            )
+        else:
+            from sqlalchemy import or_ as or_clause
+            count_query = count_query.where(
+                or_clause(
+                    models.Case.created_at >= seven_days_ago,
+                    models.Case.status.in_([models.CaseStatus.DONE, models.CaseStatus.REJECTED])
+                )
+            )
+    
+    # Get total count
+    total = db.execute(count_query).scalar()
+    
+    # Apply sorting
+    if order_by:
+        if order_by.startswith('-'):
+            field_name = order_by[1:]
+            if hasattr(models.Case, field_name):
+                query = query.order_by(getattr(models.Case, field_name).desc())
+        else:
+            if hasattr(models.Case, order_by):
+                query = query.order_by(getattr(models.Case, order_by).asc())
+    
+    # Apply pagination
+    query = query.offset(skip).limit(limit)
+    
+    # Execute query
+    cases = db.execute(query).scalars().all()
+    
+    return cases, total

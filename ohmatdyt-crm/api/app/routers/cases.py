@@ -431,9 +431,9 @@ async def list_assigned_cases(
     """
     List cases assigned to current EXECUTOR.
     
-    This endpoint shows cases that are:
-    - Assigned to current executor (responsible_id = current_user)
-    - Or cases in categories where executor has access (future enhancement)
+    BE-016: This endpoint shows cases according to executor visibility rules:
+    - For EXECUTOR: All NEW cases (available to take) OR cases assigned to executor
+    - For ADMIN: Only cases assigned to admin (can use /api/cases for all cases)
     
     Query params:
     - skip: Number of records to skip (default: 0)
@@ -501,34 +501,61 @@ async def list_assigned_cases(
                 detail=f"Invalid UUID in channel_ids parameter: {str(e)}"
             )
     
-    # For EXECUTOR: show only assigned cases
-    # For ADMIN: show all assigned to them (or could show all - configurable)
-    responsible_filter = current_user.id if current_user.role == models.UserRole.EXECUTOR else None
-    
-    cases, total = crud.get_all_cases(
-        db=db,
-        status=status,
-        category_id=category_id,
-        channel_id=channel_id,
-        responsible_id=responsible_filter,
-        public_id=public_id,
-        date_from=date_from,
-        date_to=date_to,
-        overdue=overdue,
-        order_by=order_by,
-        skip=skip,
-        limit=limit,
-        # BE-201: Extended filters
-        subcategory=subcategory,
-        applicant_name=applicant_name,
-        applicant_phone=applicant_phone,
-        applicant_email=applicant_email,
-        updated_date_from=updated_date_from,
-        updated_date_to=updated_date_to,
-        statuses=parsed_statuses,
-        category_ids=parsed_category_ids,
-        channel_ids=parsed_channel_ids
-    )
+    # BE-016: For EXECUTOR: show NEW cases OR assigned cases
+    # For ADMIN: show all assigned to them
+    if current_user.role == models.UserRole.EXECUTOR:
+        # Use specialized function for executors (BE-016 rules)
+        cases, total = crud.get_executor_cases(
+            db=db,
+            executor_id=current_user.id,
+            status=status,
+            category_id=category_id,
+            channel_id=channel_id,
+            public_id=public_id,
+            date_from=date_from,
+            date_to=date_to,
+            overdue=overdue,
+            order_by=order_by,
+            skip=skip,
+            limit=limit,
+            # BE-201: Extended filters
+            subcategory=subcategory,
+            applicant_name=applicant_name,
+            applicant_phone=applicant_phone,
+            applicant_email=applicant_email,
+            updated_date_from=updated_date_from,
+            updated_date_to=updated_date_to,
+            statuses=parsed_statuses,
+            category_ids=parsed_category_ids,
+            channel_ids=parsed_channel_ids
+        )
+    else:
+        # For ADMIN: show assigned cases
+        responsible_filter = current_user.id
+        cases, total = crud.get_all_cases(
+            db=db,
+            status=status,
+            category_id=category_id,
+            channel_id=channel_id,
+            responsible_id=responsible_filter,
+            public_id=public_id,
+            date_from=date_from,
+            date_to=date_to,
+            overdue=overdue,
+            order_by=order_by,
+            skip=skip,
+            limit=limit,
+            # BE-201: Extended filters
+            subcategory=subcategory,
+            applicant_name=applicant_name,
+            applicant_phone=applicant_phone,
+            applicant_email=applicant_email,
+            updated_date_from=updated_date_from,
+            updated_date_to=updated_date_to,
+            statuses=parsed_statuses,
+            category_ids=parsed_category_ids,
+            channel_ids=parsed_channel_ids
+        )
     
     # Convert to response schemas
     case_responses = [
