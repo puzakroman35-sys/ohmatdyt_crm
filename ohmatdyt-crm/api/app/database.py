@@ -62,3 +62,34 @@ def check_db_connection() -> bool:
     except Exception as e:
         print(f"Database connection failed: {e}")
         return False
+
+
+def check_redis_connection(redis_url: str = None) -> bool:
+    """
+    BE-015: Check if Redis connection is working.
+    
+    Args:
+        redis_url: Redis connection URL (default: from environment)
+    
+    Returns:
+        True if connection is successful, False otherwise
+    """
+    import redis
+    
+    if redis_url is None:
+        redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+    
+    try:
+        # Create Redis client
+        redis_client = redis.from_url(redis_url, decode_responses=True)
+        
+        # Try to ping Redis
+        redis_client.ping()
+        
+        # Close connection
+        redis_client.close()
+        
+        return True
+    except Exception as e:
+        print(f"Redis connection failed: {e}")
+        return False

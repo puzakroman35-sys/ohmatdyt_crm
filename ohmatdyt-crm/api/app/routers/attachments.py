@@ -12,12 +12,7 @@ from sqlalchemy.orm import Session
 from app import crud, schemas, models
 from app.database import get_db
 from app.dependencies import get_current_active_user, require_admin
-from app.utils import (
-    validate_file_type,
-    validate_file_size,
-    get_file_storage_path,
-    sanitize_filename,
-)
+from app import utils
 
 router = APIRouter(
     prefix="/api/attachments",
@@ -69,7 +64,7 @@ async def upload_attachment(
     file_size = len(file_content)
     
     # Validate file size
-    is_valid_size, size_error = validate_file_size(file_size)
+    is_valid_size, size_error = utils.validate_file_size(file_size)
     if not is_valid_size:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -78,7 +73,7 @@ async def upload_attachment(
     
     # Validate file type
     content_type = file.content_type or "application/octet-stream"
-    is_valid_type, type_error = validate_file_type(file.filename, content_type)
+    is_valid_type, type_error = utils.validate_file_type(file.filename, content_type)
     if not is_valid_type:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -86,13 +81,13 @@ async def upload_attachment(
         )
     
     # Sanitize filename and generate storage path
-    safe_filename = sanitize_filename(file.filename)
+    safe_filename = utils.sanitize_filename(file.filename)
     
     # Add UUID prefix to avoid name collisions
     unique_filename = f"{uuid_lib.uuid4().hex[:8]}_{safe_filename}"
     
     # Get relative path for storage
-    relative_path = get_file_storage_path(case.public_id, unique_filename)
+    relative_path = utils.get_file_storage_path(case.public_id, unique_filename)
     
     # Create full path
     media_root = get_media_root()

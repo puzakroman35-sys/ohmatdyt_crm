@@ -1,76 +1,79 @@
+"""
+BE-015: Celery Worker application
+
+This is a placeholder for Celery worker configuration.
+The actual worker is started via Celery CLI, not FastAPI.
+"""
 import os
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic_settings import BaseSettings
+import logging
+import json
+from datetime import datetime
+from typing import Any
 
-class Settings(BaseSettings):
-    """Application settings loaded from environment variables"""
-    APP_ENV: str = "development"
-    ALLOWED_HOSTS: str = "localhost,127.0.0.1"
-    CORS_ORIGINS: str = "http://localhost:3000"
-    DATABASE_URL: str = "postgresql+psycopg://ohm_user:change_me@db:5432/ohm_db"
-    REDIS_URL: str = "redis://redis:6379/0"
-    MEDIA_ROOT: str = "/var/app/media"
-    STATIC_ROOT: str = "/var/app/static"
+# BE-015: Simple structured logging for worker
+class JSONFormatter(logging.Formatter):
+    """JSON formatter for structured logging"""
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    def format(self, record: logging.LogRecord) -> str:
+        log_data = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+        }
+        if record.exc_info:
+            log_data["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_data, ensure_ascii=False)
 
-settings = Settings()
 
-app = FastAPI(
-    title="Ohmatdyt CRM API",
-    description="CRM system for Ohmatdyt hospital",
-    version="0.1.0",
-    docs_url="/docs" if settings.APP_ENV == "development" else None,
-    redoc_url="/redoc" if settings.APP_ENV == "development" else None,
+# Setup logging
+logger = logging.getLogger("ohmatdyt_worker")
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setFormatter(JSONFormatter())
+logger.addHandler(handler)
+logger.propagate = False
+
+
+def check_redis_connection(redis_url: str) -> bool:
+    """
+    BE-015: Check Redis connection for worker.
+    
+    Args:
+        redis_url: Redis connection URL
+    
+    Returns:
+        True if connection successful, False otherwise
+    """
+    import redis
+    
+    try:
+        redis_client = redis.from_url(redis_url, decode_responses=True)
+        redis_client.ping()
+        redis_client.close()
+        return True
+    except Exception as e:
+        logger.error(f"Redis connection failed: {e}")
+        return False
+
+
+# BE-015: Check Redis on worker startup
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+
+logger.info(
+    "Worker initializing",
+    extra={'redis_url': REDIS_URL}
 )
 
-# CORS configuration
-origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+redis_ok = check_redis_connection(REDIS_URL)
+if redis_ok:
+    logger.info("Redis connection established")
+else:
+    logger.error("Redis connection failed - worker may not function properly")
 
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {
-        "message": "Ohmatdyt CRM API",
-        "version": "0.1.0",
-        "environment": settings.APP_ENV
-    }
+logger.info("Worker initialized")
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for monitoring"""
-    return {
-        "status": "healthy",
-        "database": "connected",  # TODO: Add actual DB check
-        "redis": "connected",  # TODO: Add actual Redis check
-        "media_path": os.path.exists(settings.MEDIA_ROOT),
-        "static_path": os.path.exists(settings.STATIC_ROOT),
-    }
 
-@app.get("/config")
-async def config_check():
-    """Configuration check endpoint (dev only)"""
-    if settings.APP_ENV != "development":
-        return {"error": "Not available in production"}
-    
-    return {
-        "APP_ENV": settings.APP_ENV,
-        "DATABASE_URL": settings.DATABASE_URL[:30] + "...",  # Truncate for security
-        "REDIS_URL": settings.REDIS_URL,
-        "MEDIA_ROOT": settings.MEDIA_ROOT,
-        "STATIC_ROOT": settings.STATIC_ROOT,
-        "CORS_ORIGINS": settings.CORS_ORIGINS,
-        "ALLOWED_HOSTS": settings.ALLOWED_HOSTS,
-    }
-
-# Additional routes will be added here as the project develops
+# This file is loaded by Celery worker
+# Actual Celery configuration should be in celery.py or similar

@@ -10,9 +10,11 @@ from pydantic_settings import BaseSettings
 from sqlalchemy.orm import Session
 
 from app import crud, schemas, models
-from app.database import get_db, check_db_connection
+from app.database import get_db, check_db_connection, check_redis_connection
 from app.dependencies import get_current_user, require_admin, get_current_active_user
 from app.routers import auth, categories, channels, attachments, cases, comments, users, dashboard
+from app.middleware import RequestTrackingMiddleware
+from app.utils.logging_config import setup_logging, get_logger
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
@@ -29,6 +31,12 @@ class Settings(BaseSettings):
         case_sensitive = True
 
 settings = Settings()
+
+# BE-015: Setup structured logging
+logger = setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    logger_name="ohmatdyt_crm"
+)
 
 
 # Custom JSON encoder для UUID та datetime
@@ -82,6 +90,9 @@ app = FastAPI(
     default_response_class=CustomJSONResponse,  # Use custom JSON encoder
 )
 
+# BE-015: Add request tracking middleware
+app.add_middleware(RequestTrackingMiddleware)
+
 # CORS configuration
 origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
 app.add_middleware(
@@ -102,6 +113,49 @@ app.include_router(comments.router)
 app.include_router(users.router, prefix="/api")  # User management (ADMIN)
 app.include_router(dashboard.router)  # BE-301: Dashboard analytics (ADMIN)
 
+
+# BE-015: Application lifecycle events
+@app.on_event("startup")
+async def startup_event():
+    """Application startup event - log application start"""
+    logger.info(
+        "Application starting",
+        extra={
+            'extra_fields': {
+                'environment': settings.APP_ENV,
+                'version': '0.1.0',
+                'database_url': settings.DATABASE_URL[:30] + "...",
+                'redis_url': settings.REDIS_URL,
+            }
+        }
+    )
+    
+    # Check critical services
+    db_ok = check_db_connection()
+    redis_ok = check_redis_connection(settings.REDIS_URL)
+    
+    if not db_ok:
+        logger.error("Database connection failed on startup")
+    if not redis_ok:
+        logger.warning("Redis connection failed on startup (non-critical)")
+    
+    logger.info(
+        "Application started successfully",
+        extra={
+            'extra_fields': {
+                'database': 'connected' if db_ok else 'disconnected',
+                'redis': 'connected' if redis_ok else 'disconnected',
+            }
+        }
+    )
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Application shutdown event - log application stop"""
+    logger.info("Application shutting down")
+
+
 @app.get("/")
 async def root():
     """Root endpoint"""
@@ -111,18 +165,66 @@ async def root():
         "environment": settings.APP_ENV
     }
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for monitoring"""
-    db_status = "connected" if check_db_connection() else "disconnected"
+@app.get("/healthz")
+async def healthcheck():
+    """
+    BE-015: Enhanced health check endpoint for monitoring.
+    
+    Returns comprehensive health status including:
+    - Overall status (healthy/unhealthy)
+    - Database connection status
+    - Redis connection status
+    - File system paths status
+    - Timestamp and version
+    """
+    from datetime import datetime
+    
+    # Check database connection
+    db_status = check_db_connection()
+    
+    # Check Redis connection
+    redis_status = check_redis_connection(settings.REDIS_URL)
+    
+    # Check file system paths
+    media_exists = os.path.exists(settings.MEDIA_ROOT)
+    static_exists = os.path.exists(settings.STATIC_ROOT)
+    
+    # Determine overall status
+    overall_status = "healthy" if (db_status and redis_status) else "unhealthy"
+    
+    # Log health check
+    if overall_status == "unhealthy":
+        logger.warning(
+            "Health check failed",
+            extra={
+                'extra_fields': {
+                    'database': db_status,
+                    'redis': redis_status,
+                }
+            }
+        )
     
     return {
-        "status": "healthy" if db_status == "connected" else "unhealthy",
-        "database": db_status,
-        "redis": "connected",  # TODO: Add actual Redis check
-        "media_path": os.path.exists(settings.MEDIA_ROOT),
-        "static_path": os.path.exists(settings.STATIC_ROOT),
+        "status": overall_status,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "version": "0.1.0",
+        "services": {
+            "database": "connected" if db_status else "disconnected",
+            "redis": "connected" if redis_status else "disconnected",
+        },
+        "filesystem": {
+            "media_path": media_exists,
+            "static_path": static_exists,
+        },
     }
+
+@app.get("/health")
+async def health_check_legacy():
+    """
+    Legacy health check endpoint (deprecated, use /healthz instead).
+    Kept for backward compatibility.
+    """
+    return await healthcheck()
 
 @app.get("/config")
 async def config_check():
