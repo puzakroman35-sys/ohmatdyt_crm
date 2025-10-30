@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { Button, Modal, Form, Select, Input, message, Space } from 'antd';
+import { Button, Modal, Form, Select, Input, message, Space, Alert } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import api from '@/lib/api';
 
@@ -16,11 +16,12 @@ interface ChangeStatusFormProps {
   caseId: string;
   casePublicId: number;
   currentStatus: string;
+  userRole?: 'OPERATOR' | 'EXECUTOR' | 'ADMIN';
   onSuccess: () => void;
 }
 
-// Можливі переходи статусів
-const statusTransitions: Record<string, Array<{ value: string; label: string; color: string }>> = {
+// Можливі переходи статусів для EXECUTOR
+const executorStatusTransitions: Record<string, Array<{ value: string; label: string; color: string }>> = {
   IN_PROGRESS: [
     { value: 'NEEDS_INFO', label: 'Потрібна інформація', color: 'red' },
     { value: 'REJECTED', label: 'Відхилено', color: 'red' },
@@ -33,18 +34,31 @@ const statusTransitions: Record<string, Array<{ value: string; label: string; co
   ],
 };
 
+// FE-011: Всі можливі статуси для ADMIN (без обмежень)
+const allStatuses: Array<{ value: string; label: string; color: string }> = [
+  { value: 'NEW', label: 'Новий', color: 'blue' },
+  { value: 'IN_PROGRESS', label: 'В роботі', color: 'orange' },
+  { value: 'NEEDS_INFO', label: 'Потрібна інформація', color: 'red' },
+  { value: 'REJECTED', label: 'Відхилено', color: 'red' },
+  { value: 'DONE', label: 'Виконано', color: 'green' },
+];
+
 const ChangeStatusForm: React.FC<ChangeStatusFormProps> = ({
   caseId,
   casePublicId,
   currentStatus,
+  userRole,
   onSuccess,
 }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
 
-  // Доступні статуси для переходу
-  const availableStatuses = statusTransitions[currentStatus] || [];
+  // FE-011: ADMIN має доступ до всіх статусів, EXECUTOR - обмежені переходи
+  const isAdmin = userRole === 'ADMIN';
+  const availableStatuses = isAdmin
+    ? allStatuses.filter((s) => s.value !== currentStatus) // ADMIN бачить всі, крім поточного
+    : executorStatusTransitions[currentStatus] || [];
 
   // Показуємо кнопку тільки якщо є доступні переходи
   if (availableStatuses.length === 0) {
@@ -99,6 +113,16 @@ const ChangeStatusForm: React.FC<ChangeStatusFormProps> = ({
         footer={null}
         width={600}
       >
+        {isAdmin && (
+          <Alert
+            message="Розширені права адміністратора"
+            description="Як адміністратор, ви можете змінити статус звернення на будь-який інший, включаючи повернення в статус 'Новий'."
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
         <Form
           form={form}
           layout="vertical"
