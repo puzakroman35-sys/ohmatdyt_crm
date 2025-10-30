@@ -1188,48 +1188,49 @@ async def change_case_status(
 
 # ==================== BE-017: Admin Case Management Endpoints ====================
 
-@router.patch("/{case_id}", response_model=schemas.CaseResponse)
-async def update_case_fields(
+@router.patch("/{case_id}/assign", response_model=schemas.CaseResponse)
+async def assign_case_executor(
     case_id: UUID,
-    case_update: schemas.CaseUpdate,
+    assignment: schemas.CaseAssignmentRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_admin)
 ):
     """
-    Update case fields (ADMIN only).
+    Assign or unassign executor to a case (ADMIN only).
     
-    BE-017: This endpoint allows ADMIN to edit all case fields including:
-    - category_id: Change case category
-    - subcategory: Change subcategory
-    - channel_id: Change communication channel
-    - applicant_name: Edit applicant name
-    - applicant_phone: Edit phone number
-    - applicant_email: Edit email address
-    - summary: Edit case description
+    BE-017: This endpoint allows ADMIN to manage case assignments:
+    - Assign executor: Sets responsible_id and changes status to IN_PROGRESS
+    - Unassign executor: Clears responsible_id and changes status back to NEW
     
     Business rules:
     - Only ADMIN role has access
-    - All validations apply (category/channel existence, active status, email format, etc.)
-    - Changes are logged in case history
-    - Returns full updated case information
+    - Assigned user must be EXECUTOR or ADMIN
+    - Assigned user must be active
+    - When assigning: status -> IN_PROGRESS (if not already)
+    - When unassigning (null): status -> NEW
+    - Assignment changes are logged in case history
+    
+    Request body:
+    - assigned_to_id: UUID of executor to assign, or null to unassign
     
     RBAC:
-    - ADMIN: Full access to edit any case
+    - ADMIN: Full access to assign/unassign any case
     - EXECUTOR/OPERATOR: 403 Forbidden
     
     Returns:
-    - Updated case with all fields
+    - Updated case with new assignment and status
     
     Errors:
-    - 400: Validation error (invalid category, channel, email format, etc.)
+    - 400: Validation error (invalid user, not an executor, inactive user)
     - 403: User is not ADMIN
     - 404: Case not found
     """
     try:
-        db_case = crud.update_case(
+        db_case = crud.assign_case_executor(
             db=db,
             case_id=case_id,
-            case_update=case_update
+            executor_id=assignment.assigned_to_id,
+            admin_id=current_user.id
         )
         
         if not db_case:
@@ -1261,8 +1262,8 @@ async def update_case_fields(
         )
 
 
-@router.patch("/{case_id}/assign", response_model=schemas.CaseResponse)
-async def assign_case_executor(
+@router.patch("/{case_id}", response_model=schemas.CaseResponse)
+async def update_case_fields(
     case_id: UUID,
     assignment: schemas.CaseAssignmentRequest,
     db: Session = Depends(get_db),

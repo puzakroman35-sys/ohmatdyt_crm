@@ -279,10 +279,6 @@ const CasesPage: React.FC = () => {
           {statusLabels[status]}
         </Tag>
       ),
-      filters: Object.entries(statusLabels).map(([key, label]) => ({
-        text: label,
-        value: key,
-      })),
     },
     {
       title: 'Відповідальний',
