@@ -102,8 +102,6 @@ services:
       - ./frontend/tsconfig.json:/app/tsconfig.json
       - ./frontend/next.config.js:/app/next.config.js
     restart: unless-stopped
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
 
   nginx:
     image: nginx:1.25-alpine
@@ -122,5 +120,11 @@ services:
 
 volumes:
   db-data:
+    external: true
+    name: ohmatdyt_crm_db-data
   media:
+    external: true
+    name: ohmatdyt_crm_media
   static:
+    external: true
+    name: ohmatdyt_crm_static
