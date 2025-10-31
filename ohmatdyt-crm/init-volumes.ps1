@@ -1,0 +1,22 @@
+# Скрипт для створення external volumes (PowerShell версія)
+# Ці volumes не будуть видалені при docker compose down -v
+
+Write-Host "🔧 Створення external volumes для production..." -ForegroundColor Cyan
+
+# Створюємо volumes якщо їх ще немає
+docker volume create ohmatdyt_crm_db-data
+docker volume create ohmatdyt_crm_media
+docker volume create ohmatdyt_crm_static
+
+Write-Host "`n✅ Volumes створено:" -ForegroundColor Green
+docker volume ls | Select-String "ohmatdyt_crm"
+
+Write-Host "`n📊 Інформація про volumes:" -ForegroundColor Yellow
+Write-Host "db-data:"
+docker volume inspect ohmatdyt_crm_db-data --format '{{.Mountpoint}}'
+Write-Host "media:"
+docker volume inspect ohmatdyt_crm_media --format '{{.Mountpoint}}'
+Write-Host "static:"
+docker volume inspect ohmatdyt_crm_static --format '{{.Mountpoint}}'
+
+Write-Host "`n✅ Готово! Тепер ці volumes будуть збережені навіть після 'docker compose down -v'" -ForegroundColor Green
