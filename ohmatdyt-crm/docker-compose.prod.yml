@@ -2,8 +2,6 @@ services:
   api:
     env_file:
       - .env.prod
-    build:
-      target: prod
   
   worker:
     env_file:
@@ -18,6 +16,7 @@ services:
       - .env.prod
     build:
       target: prod
+    volumes: []  # Remove dev volume mounts for production
   
   # INF-003: Production Nginx with HTTPS support
   nginx:
