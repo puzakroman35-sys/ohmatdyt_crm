@@ -4,10 +4,11 @@ Utility functions for Ohmatdyt CRM
 import random
 import os
 import mimetypes
-from typing import Tuple
+from typing import Tuple, Optional
+from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from app.models import Case
+from app.models import Case, StatusHistory
 
 
 def generate_unique_public_id(db: Session, max_attempts: int = 10) -> int:
@@ -183,3 +184,23 @@ def sanitize_filename(filename: str) -> str:
     
     return filename
 
+
+def get_last_status_change_date(db: Session, case_id) -> Optional[datetime]:
+    """
+    Get the date of the last status change for a case.
+    
+    Args:
+        db: Database session
+        case_id: UUID of the case
+        
+    Returns:
+        datetime: Date of last status change, or None if no history exists
+    """
+    from app import models
+    
+    last_change = db.query(models.StatusHistory)\
+        .filter(models.StatusHistory.case_id == case_id)\
+        .order_by(models.StatusHistory.changed_at.desc())\
+        .first()
+    
+    return last_change.changed_at if last_change else None

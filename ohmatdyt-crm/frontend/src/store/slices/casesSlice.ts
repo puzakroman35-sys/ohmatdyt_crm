@@ -55,6 +55,7 @@ export interface Case {
   responsible_id?: string;
   created_at: string;
   updated_at: string;
+  last_status_change_at?: string;  // Час останньої зміни статусу
   category?: Category;
   channel?: Channel;
   author?: User;

@@ -362,7 +362,20 @@ const CasesPage: React.FC = () => {
     });
   }
 
-  // Перевірка чи прострочено звернення (більше 7 днів)
+  // Перевірка чи статус не змінювався протягом 3 днів
+  const isStatusStale = (lastStatusChangeAt: string | undefined, createdAt: string, status: CaseStatus) => {
+    // Не підсвічуємо завершені або відхилені звернення
+    if (status === 'DONE' || status === 'REJECTED') return false;
+    
+    // Використовуємо last_status_change_at якщо є, інакше created_at
+    const referenceDate = lastStatusChangeAt || createdAt;
+    const daysDiff = dayjs().diff(dayjs(referenceDate), 'day');
+    
+    // Підсвічуємо якщо пройшло 3 або більше днів
+    return daysDiff >= 3;
+  };
+
+  // Перевірка чи прострочено звернення (більше 7 днів) - для старої логіки
   const isOverdue = (createdAt: string, status: CaseStatus) => {
     if (status === 'DONE' || status === 'REJECTED') return false;
     const daysDiff = dayjs().diff(dayjs(createdAt), 'day');
@@ -371,7 +384,15 @@ const CasesPage: React.FC = () => {
 
   // Рядки з підсвіткою
   const getRowClassName = (record: Case) => {
-    return isOverdue(record.created_at, record.status) ? 'overdue-row' : '';
+    // Пріоритет: спочатку перевіряємо на застарілий статус (3 дні)
+    if (isStatusStale(record.last_status_change_at, record.created_at, record.status)) {
+      return 'stale-status-row';
+    }
+    // Потім перевіряємо на прострочене звернення (7 днів від створення)
+    if (isOverdue(record.created_at, record.status)) {
+      return 'overdue-row';
+    }
+    return '';
   };
 
   return (
@@ -529,16 +550,6 @@ const CasesPage: React.FC = () => {
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        .overdue-row {
-          background-color: #fff2f0 !important;
-          border-left: 3px solid #ff4d4f;
-        }
-        .overdue-row:hover {
-          background-color: #ffe7e6 !important;
-        }
-      `}</style>
     </AuthGuard>
   );
 };

@@ -283,6 +283,7 @@ class CaseResponse(CaseBase):
     responsible_id: Optional[str]
     created_at: datetime
     updated_at: datetime
+    last_status_change_at: Optional[datetime] = None  # Час останньої зміни статусу
     
     # Optional nested objects (can be populated with joins)
     category: Optional[CategoryResponse] = None

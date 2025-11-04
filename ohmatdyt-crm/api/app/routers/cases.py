@@ -32,6 +32,69 @@ def get_media_root() -> str:
     return os.getenv("MEDIA_ROOT", "/var/app/media")
 
 
+def build_case_response(case: models.Case, db: Session) -> schemas.CaseResponse:
+    """
+    Build CaseResponse with last_status_change_at calculated from status history.
+    
+    Args:
+        case: Case model instance
+        db: Database session
+        
+    Returns:
+        CaseResponse with all fields populated
+    """
+    # Отримуємо останню зміну статусу
+    last_status_change = db.query(models.StatusHistory)\
+        .filter(models.StatusHistory.case_id == case.id)\
+        .order_by(models.StatusHistory.changed_at.desc())\
+        .first()
+    
+    last_status_change_at = last_status_change.changed_at if last_status_change else case.created_at
+    
+    return schemas.CaseResponse(
+        id=str(case.id),
+        public_id=case.public_id,
+        category_id=str(case.category_id),
+        channel_id=str(case.channel_id),
+        subcategory=case.subcategory,
+        applicant_name=case.applicant_name,
+        applicant_phone=case.applicant_phone,
+        applicant_email=case.applicant_email,
+        summary=case.summary,
+        status=case.status,
+        author_id=str(case.author_id),
+        responsible_id=str(case.responsible_id) if case.responsible_id else None,
+        created_at=case.created_at,
+        updated_at=case.updated_at,
+        last_status_change_at=last_status_change_at,
+        # Add nested objects for frontend
+        category=schemas.CategoryResponse(
+            id=str(case.category.id),
+            name=case.category.name,
+            is_active=case.category.is_active,
+            created_at=case.category.created_at,
+            updated_at=case.category.updated_at
+        ) if case.category else None,
+        channel=schemas.ChannelResponse(
+            id=str(case.channel.id),
+            name=case.channel.name,
+            is_active=case.channel.is_active,
+            created_at=case.channel.created_at,
+            updated_at=case.channel.updated_at
+        ) if case.channel else None,
+        responsible=schemas.UserResponse(
+            id=str(case.responsible.id),
+            username=case.responsible.username,
+            email=case.responsible.email,
+            full_name=case.responsible.full_name,
+            role=case.responsible.role,
+            is_active=case.responsible.is_active,
+            created_at=case.responsible.created_at,
+            updated_at=case.responsible.updated_at
+        ) if case.responsible else None
+    )
+
+
 @router.post("", response_model=schemas.CaseResponse, status_code=status.HTTP_201_CREATED)
 async def create_case_with_attachments(
     # Required fields
@@ -344,51 +407,8 @@ async def list_my_cases(
         channel_ids=parsed_channel_ids
     )
     
-    # Convert to response schemas
-    case_responses = [
-        schemas.CaseResponse(
-            id=str(case.id),
-            public_id=case.public_id,
-            category_id=str(case.category_id),
-            channel_id=str(case.channel_id),
-            subcategory=case.subcategory,
-            applicant_name=case.applicant_name,
-            applicant_phone=case.applicant_phone,
-            applicant_email=case.applicant_email,
-            summary=case.summary,
-            status=case.status,
-            author_id=str(case.author_id),
-            responsible_id=str(case.responsible_id) if case.responsible_id else None,
-            created_at=case.created_at,
-            updated_at=case.updated_at,
-            # Add nested objects for frontend
-            category=schemas.CategoryResponse(
-                id=str(case.category.id),
-                name=case.category.name,
-                is_active=case.category.is_active,
-                created_at=case.category.created_at,
-                updated_at=case.category.updated_at
-            ) if case.category else None,
-            channel=schemas.ChannelResponse(
-                id=str(case.channel.id),
-                name=case.channel.name,
-                is_active=case.channel.is_active,
-                created_at=case.channel.created_at,
-                updated_at=case.channel.updated_at
-            ) if case.channel else None,
-            responsible=schemas.UserResponse(
-                id=str(case.responsible.id),
-                username=case.responsible.username,
-                email=case.responsible.email,
-                full_name=case.responsible.full_name,
-                role=case.responsible.role,
-                is_active=case.responsible.is_active,
-                created_at=case.responsible.created_at,
-                updated_at=case.responsible.updated_at
-            ) if case.responsible else None
-        )
-        for case in cases
-    ]
+    # Convert to response schemas using helper function
+    case_responses = [build_case_response(case, db) for case in cases]
     
     return {
         "cases": case_responses,
@@ -552,51 +572,8 @@ async def list_assigned_cases(
             channel_ids=parsed_channel_ids
         )
     
-    # Convert to response schemas
-    case_responses = [
-        schemas.CaseResponse(
-            id=str(case.id),
-            public_id=case.public_id,
-            category_id=str(case.category_id),
-            channel_id=str(case.channel_id),
-            subcategory=case.subcategory,
-            applicant_name=case.applicant_name,
-            applicant_phone=case.applicant_phone,
-            applicant_email=case.applicant_email,
-            summary=case.summary,
-            status=case.status,
-            author_id=str(case.author_id),
-            responsible_id=str(case.responsible_id) if case.responsible_id else None,
-            created_at=case.created_at,
-            updated_at=case.updated_at,
-            # Add nested objects for frontend
-            category=schemas.CategoryResponse(
-                id=str(case.category.id),
-                name=case.category.name,
-                is_active=case.category.is_active,
-                created_at=case.category.created_at,
-                updated_at=case.category.updated_at
-            ) if case.category else None,
-            channel=schemas.ChannelResponse(
-                id=str(case.channel.id),
-                name=case.channel.name,
-                is_active=case.channel.is_active,
-                created_at=case.channel.created_at,
-                updated_at=case.channel.updated_at
-            ) if case.channel else None,
-            responsible=schemas.UserResponse(
-                id=str(case.responsible.id),
-                username=case.responsible.username,
-                email=case.responsible.email,
-                full_name=case.responsible.full_name,
-                role=case.responsible.role,
-                is_active=case.responsible.is_active,
-                created_at=case.responsible.created_at,
-                updated_at=case.responsible.updated_at
-            ) if case.responsible else None
-        )
-        for case in cases
-    ]
+    # Convert to response schemas using helper function
+    case_responses = [build_case_response(case, db) for case in cases]
     
     return {
         "cases": case_responses,
@@ -941,51 +918,8 @@ async def list_cases(
         channel_ids=parsed_channel_ids
     )
     
-    # Convert to response schemas
-    case_responses = [
-        schemas.CaseResponse(
-            id=str(case.id),
-            public_id=case.public_id,
-            category_id=str(case.category_id),
-            channel_id=str(case.channel_id),
-            subcategory=case.subcategory,
-            applicant_name=case.applicant_name,
-            applicant_phone=case.applicant_phone,
-            applicant_email=case.applicant_email,
-            summary=case.summary,
-            status=case.status,
-            author_id=str(case.author_id),
-            responsible_id=str(case.responsible_id) if case.responsible_id else None,
-            created_at=case.created_at,
-            updated_at=case.updated_at,
-            # Add nested objects for frontend
-            category=schemas.CategoryResponse(
-                id=str(case.category.id),
-                name=case.category.name,
-                is_active=case.category.is_active,
-                created_at=case.category.created_at,
-                updated_at=case.category.updated_at
-            ) if case.category else None,
-            channel=schemas.ChannelResponse(
-                id=str(case.channel.id),
-                name=case.channel.name,
-                is_active=case.channel.is_active,
-                created_at=case.channel.created_at,
-                updated_at=case.channel.updated_at
-            ) if case.channel else None,
-            responsible=schemas.UserResponse(
-                id=str(case.responsible.id),
-                username=case.responsible.username,
-                email=case.responsible.email,
-                full_name=case.responsible.full_name,
-                role=case.responsible.role,
-                is_active=case.responsible.is_active,
-                created_at=case.responsible.created_at,
-                updated_at=case.responsible.updated_at
-            ) if case.responsible else None
-        )
-        for case in cases
-    ]
+    # Convert to response schemas using helper function
+    case_responses = [build_case_response(case, db) for case in cases]
     
     return {
         "cases": case_responses,
