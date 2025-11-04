@@ -4,7 +4,7 @@ import logging
 from typing import Optional
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from app import models, schemas
 from app.auth import hash_password
@@ -2766,3 +2766,247 @@ def get_executor_cases(
     cases = db.execute(query).scalars().all()
     
     return cases, total
+
+
+# ============================================================================
+# BE-018: Executor Category Access CRUD
+# ============================================================================
+
+def get_executor_category_access(
+    db: Session,
+    executor_id: UUID
+) -> list[models.ExecutorCategoryAccess]:
+    """
+    Отримує всі доступи виконавця до категорій.
+    
+    Args:
+        db: Database session
+        executor_id: UUID виконавця
+        
+    Returns:
+        Список доступів з joined категоріями
+    """
+    query = select(models.ExecutorCategoryAccess).options(
+        joinedload(models.ExecutorCategoryAccess.category)
+    ).where(
+        models.ExecutorCategoryAccess.executor_id == executor_id
+    ).order_by(
+        models.ExecutorCategoryAccess.created_at.asc()
+    )
+    
+    access_records = db.execute(query).scalars().all()
+    return list(access_records)
+
+
+def add_executor_category_access(
+    db: Session,
+    executor_id: UUID,
+    category_ids: list[UUID]
+) -> tuple[list[models.ExecutorCategoryAccess], list[str]]:
+    """
+    Додає доступ виконавця до категорій (масове додавання).
+    
+    Перевірки:
+    - Користувач має роль EXECUTOR
+    - Категорії існують та активні
+    - Уникає дублікатів (якщо доступ вже існує, пропускає)
+    
+    Args:
+        db: Database session
+        executor_id: UUID виконавця
+        category_ids: Список UUID категорій
+        
+    Returns:
+        Tuple (created_records, error_messages)
+        - created_records: Список створених доступів
+        - error_messages: Список помилок (якщо є)
+        
+    Raises:
+        ValueError: якщо користувач не EXECUTOR або категорія неактивна
+    """
+    # Перевірка що користувач існує та є EXECUTOR
+    executor = get_user(db, executor_id)
+    if not executor:
+        raise ValueError(f"User with id '{executor_id}' not found")
+    
+    if executor.role != models.UserRole.EXECUTOR:
+        raise ValueError(f"User '{executor.username}' is not an EXECUTOR (current role: {executor.role.value})")
+    
+    created_records = []
+    error_messages = []
+    
+    for category_id in category_ids:
+        # Перевірка що категорія існує
+        category = db.execute(
+            select(models.Category).where(models.Category.id == category_id)
+        ).scalar_one_or_none()
+        
+        if not category:
+            error_messages.append(f"Category with id '{category_id}' not found")
+            continue
+        
+        # Перевірка чи доступ вже існує
+        existing_access = db.execute(
+            select(models.ExecutorCategoryAccess).where(
+                models.ExecutorCategoryAccess.executor_id == executor_id,
+                models.ExecutorCategoryAccess.category_id == category_id
+            )
+        ).scalar_one_or_none()
+        
+        if existing_access:
+            error_messages.append(
+                f"Access already exists for category '{category.name}' (id: {category_id})"
+            )
+            continue
+        
+        # Створення доступу
+        access = models.ExecutorCategoryAccess(
+            executor_id=executor_id,
+            category_id=category_id
+        )
+        
+        db.add(access)
+        created_records.append(access)
+    
+    if created_records:
+        db.commit()
+        # Refresh всі створені записи
+        for record in created_records:
+            db.refresh(record)
+    
+    return created_records, error_messages
+
+
+def remove_executor_category_access(
+    db: Session,
+    executor_id: UUID,
+    category_id: UUID
+) -> bool:
+    """
+    Видаляє доступ виконавця до конкретної категорії.
+    
+    Args:
+        db: Database session
+        executor_id: UUID виконавця
+        category_id: UUID категорії
+        
+    Returns:
+        True якщо доступ видалено, False якщо доступ не знайдено
+    """
+    access = db.execute(
+        select(models.ExecutorCategoryAccess).where(
+            models.ExecutorCategoryAccess.executor_id == executor_id,
+            models.ExecutorCategoryAccess.category_id == category_id
+        )
+    ).scalar_one_or_none()
+    
+    if not access:
+        return False
+    
+    db.delete(access)
+    db.commit()
+    
+    return True
+
+
+def replace_executor_category_access(
+    db: Session,
+    executor_id: UUID,
+    category_ids: list[UUID]
+) -> tuple[list[models.ExecutorCategoryAccess], int]:
+    """
+    Замінює всі доступи виконавця новим списком категорій (масове оновлення).
+    
+    Алгоритм:
+    1. Видаляє всі поточні доступи
+    2. Додає нові доступи для переданих категорій
+    
+    Транзакційність: всі операції виконуються в одній транзакції.
+    
+    Args:
+        db: Database session
+        executor_id: UUID виконавця
+        category_ids: Новий список UUID категорій
+        
+    Returns:
+        Tuple (new_access_records, deleted_count)
+        - new_access_records: Список нових доступів
+        - deleted_count: Кількість видалених доступів
+        
+    Raises:
+        ValueError: якщо користувач не EXECUTOR або категорія не існує
+    """
+    # Перевірка що користувач існує та є EXECUTOR
+    executor = get_user(db, executor_id)
+    if not executor:
+        raise ValueError(f"User with id '{executor_id}' not found")
+    
+    if executor.role != models.UserRole.EXECUTOR:
+        raise ValueError(f"User '{executor.username}' is not an EXECUTOR (current role: {executor.role.value})")
+    
+    # Видалення всіх поточних доступів
+    deleted_result = db.execute(
+        delete(models.ExecutorCategoryAccess).where(
+            models.ExecutorCategoryAccess.executor_id == executor_id
+        )
+    )
+    deleted_count = deleted_result.rowcount
+    
+    # Додавання нових доступів
+    new_records = []
+    
+    for category_id in category_ids:
+        # Перевірка що категорія існує
+        category = db.execute(
+            select(models.Category).where(models.Category.id == category_id)
+        ).scalar_one_or_none()
+        
+        if not category:
+            # Rollback транзакції якщо категорія не знайдена
+            db.rollback()
+            raise ValueError(f"Category with id '{category_id}' not found")
+        
+        # Створення нового доступу
+        access = models.ExecutorCategoryAccess(
+            executor_id=executor_id,
+            category_id=category_id
+        )
+        
+        db.add(access)
+        new_records.append(access)
+    
+    # Commit всіх змін
+    db.commit()
+    
+    # Refresh всі створені записи
+    for record in new_records:
+        db.refresh(record)
+    
+    return new_records, deleted_count
+
+
+def check_executor_has_category_access(
+    db: Session,
+    executor_id: UUID,
+    category_id: UUID
+) -> bool:
+    """
+    Перевіряє чи має виконавець доступ до категорії.
+    
+    Args:
+        db: Database session
+        executor_id: UUID виконавця
+        category_id: UUID категорії
+        
+    Returns:
+        True якщо доступ є, False якщо немає
+    """
+    access = db.execute(
+        select(models.ExecutorCategoryAccess).where(
+            models.ExecutorCategoryAccess.executor_id == executor_id,
+            models.ExecutorCategoryAccess.category_id == category_id
+        )
+    ).scalar_one_or_none()
+    
+    return access is not None
+

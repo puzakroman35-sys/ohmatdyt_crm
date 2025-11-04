@@ -500,3 +500,312 @@ async def get_user_active_cases(
         "active_cases_count": len(active_cases),
         "case_ids": [str(case.id) for case in active_cases]
     }
+
+
+# ============================================================================
+# BE-018: Executor Category Access Management (ADMIN only)
+# ============================================================================
+
+@router.get("/{user_id}/category-access", response_model=schemas.ExecutorCategoriesListResponse)
+async def get_executor_category_access(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
+    """
+    BE-018: Отримати список категорій до яких має доступ виконавець (ADMIN тільки).
+    
+    **Path Parameters:**
+    - user_id: UUID користувача (має бути EXECUTOR)
+    
+    **Response:**
+    - executor_id: UUID виконавця
+    - executor_username: Ім'я користувача
+    - total: Загальна кількість категорій з доступом
+    - categories: Список категорій з деталями доступу
+    
+    **Errors:**
+    - 400: Невалідний UUID формат
+    - 401: Не авторизований
+    - 403: Недостатньо прав (потрібен ADMIN)
+    - 404: Користувача не знайдено
+    
+    **Note:**
+    Повертає тільки категорії до яких виконавець має явний доступ.
+    """
+    try:
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user ID format"
+        )
+    
+    # Перевірка що користувач існує
+    db_user = crud.get_user(db, user_uuid)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with id '{user_id}' not found"
+        )
+    
+    # Отримання доступів
+    access_records = crud.get_executor_category_access(db=db, executor_id=user_uuid)
+    
+    # Формування відповіді
+    categories_response = []
+    for access in access_records:
+        categories_response.append(schemas.CategoryAccessResponse(
+            id=str(access.id),
+            executor_id=str(access.executor_id),
+            category_id=str(access.category_id),
+            category_name=access.category.name if access.category else None,
+            created_at=access.created_at,
+            updated_at=access.updated_at
+        ))
+    
+    return {
+        "executor_id": str(user_uuid),
+        "executor_username": db_user.username,
+        "total": len(categories_response),
+        "categories": categories_response
+    }
+
+
+@router.post("/{user_id}/category-access", response_model=schemas.ExecutorCategoriesListResponse, status_code=status.HTTP_201_CREATED)
+async def add_executor_category_access(
+    user_id: str,
+    access_data: schemas.CategoryAccessCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
+    """
+    BE-018: Додати доступ виконавцю до категорій (ADMIN тільки).
+    
+    **Path Parameters:**
+    - user_id: UUID користувача (має бути EXECUTOR)
+    
+    **Request Body:**
+    - category_ids: Список UUID категорій для надання доступу
+    
+    **Response:**
+    - executor_id: UUID виконавця
+    - executor_username: Ім'я користувача
+    - total: Загальна кількість категорій з доступом (після додавання)
+    - categories: Оновлений список категорій з доступом
+    
+    **Errors:**
+    - 400: Невалідний UUID або користувач не EXECUTOR
+    - 401: Не авторизований
+    - 403: Недостатньо прав (потрібен ADMIN)
+    - 404: Користувача або категорію не знайдено
+    - 422: Помилка валідації
+    
+    **Note:**
+    - Масове додавання: можна додати кілька категорій одночасно
+    - Якщо доступ вже існує, він буде пропущений (не помилка)
+    - Транзакційність: всі або нічого
+    """
+    try:
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user ID format"
+        )
+    
+    # Конвертація category_ids в UUID
+    category_uuids = []
+    for cat_id in access_data.category_ids:
+        try:
+            category_uuids.append(UUID(cat_id))
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid category ID format: {cat_id}"
+            )
+    
+    try:
+        # Додавання доступів
+        created_records, error_messages = crud.add_executor_category_access(
+            db=db,
+            executor_id=user_uuid,
+            category_ids=category_uuids
+        )
+        
+        # Отримання оновленого списку всіх доступів
+        all_access = crud.get_executor_category_access(db=db, executor_id=user_uuid)
+        
+        # Отримання інформації про користувача
+        db_user = crud.get_user(db, user_uuid)
+        
+        # Формування відповіді
+        categories_response = []
+        for access in all_access:
+            categories_response.append(schemas.CategoryAccessResponse(
+                id=str(access.id),
+                executor_id=str(access.executor_id),
+                category_id=str(access.category_id),
+                category_name=access.category.name if access.category else None,
+                created_at=access.created_at,
+                updated_at=access.updated_at
+            ))
+        
+        return {
+            "executor_id": str(user_uuid),
+            "executor_username": db_user.username,
+            "total": len(categories_response),
+            "categories": categories_response
+        }
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.delete("/{user_id}/category-access/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_executor_category_access(
+    user_id: str,
+    category_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
+    """
+    BE-018: Видалити доступ виконавця до конкретної категорії (ADMIN тільки).
+    
+    **Path Parameters:**
+    - user_id: UUID користувача
+    - category_id: UUID категорії
+    
+    **Response:**
+    - 204 No Content (успішне видалення)
+    
+    **Errors:**
+    - 400: Невалідний UUID формат
+    - 401: Не авторизований
+    - 403: Недостатньо прав (потрібен ADMIN)
+    - 404: Доступ не знайдено
+    
+    **Note:**
+    Якщо доступ не існував, повертає 404.
+    """
+    try:
+        user_uuid = UUID(user_id)
+        category_uuid = UUID(category_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user ID or category ID format"
+        )
+    
+    # Видалення доступу
+    success = crud.remove_executor_category_access(
+        db=db,
+        executor_id=user_uuid,
+        category_id=category_uuid
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Category access not found for user '{user_id}' and category '{category_id}'"
+        )
+    
+    return None  # 204 No Content
+
+
+@router.put("/{user_id}/category-access", response_model=schemas.ExecutorCategoriesListResponse)
+async def replace_executor_category_access(
+    user_id: str,
+    access_data: schemas.CategoryAccessUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
+    """
+    BE-018: Замінити всі доступи виконавця новим списком категорій (ADMIN тільки).
+    
+    **Path Parameters:**
+    - user_id: UUID користувача (має бути EXECUTOR)
+    
+    **Request Body:**
+    - category_ids: Новий список UUID категорій (замінює всі існуючі)
+    
+    **Response:**
+    - executor_id: UUID виконавця
+    - executor_username: Ім'я користувача
+    - total: Загальна кількість категорій з доступом (після заміни)
+    - categories: Новий список категорій з доступом
+    
+    **Errors:**
+    - 400: Невалідний UUID або користувач не EXECUTOR
+    - 401: Не авторизований
+    - 403: Недостатньо прав (потрібен ADMIN)
+    - 404: Користувача або категорію не знайдено
+    - 422: Помилка валідації
+    
+    **Note:**
+    - Видаляє ВСІ існуючі доступи та створює нові
+    - Транзакційність: всі або нічого
+    - Якщо category_ids порожній список, видаляє всі доступи
+    """
+    try:
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user ID format"
+        )
+    
+    # Конвертація category_ids в UUID
+    category_uuids = []
+    for cat_id in access_data.category_ids:
+        try:
+            category_uuids.append(UUID(cat_id))
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid category ID format: {cat_id}"
+            )
+    
+    try:
+        # Заміна всіх доступів
+        new_records, deleted_count = crud.replace_executor_category_access(
+            db=db,
+            executor_id=user_uuid,
+            category_ids=category_uuids
+        )
+        
+        # Отримання інформації про користувача
+        db_user = crud.get_user(db, user_uuid)
+        
+        # Формування відповіді
+        categories_response = []
+        for access in new_records:
+            # Завантаження category для отримання назви
+            access_with_category = crud.get_executor_category_access(db=db, executor_id=user_uuid)
+            for acc in access_with_category:
+                if acc.id == access.id:
+                    categories_response.append(schemas.CategoryAccessResponse(
+                        id=str(acc.id),
+                        executor_id=str(acc.executor_id),
+                        category_id=str(acc.category_id),
+                        category_name=acc.category.name if acc.category else None,
+                        created_at=acc.created_at,
+                        updated_at=acc.updated_at
+                    ))
+                    break
+        
+        return {
+            "executor_id": str(user_uuid),
+            "executor_username": db_user.username,
+            "total": len(categories_response),
+            "categories": categories_response
+        }
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )

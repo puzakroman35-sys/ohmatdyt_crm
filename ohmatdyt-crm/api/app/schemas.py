@@ -605,3 +605,106 @@ class CategoriesTopResponse(BaseModel):
     total_cases_all_categories: int = Field(..., description="Total cases across all categories")
     top_categories: list[CategoryTopItem] = Field(..., description="Top categories by case count")
     limit: int = Field(..., description="Number of top categories returned")
+
+
+# ============================================================================
+# BE-018: Executor Category Access Schemas
+# ============================================================================
+
+class CategoryAccessBase(BaseModel):
+    """Base schema for executor category access"""
+    category_id: str  # UUID as string
+    
+    @field_validator('category_id')
+    @classmethod
+    def validate_category_id(cls, v: str) -> str:
+        """Validate that category_id is a valid UUID"""
+        try:
+            UUID(v)
+            return v
+        except ValueError:
+            raise ValueError("category_id must be a valid UUID")
+
+
+class CategoryAccessCreate(BaseModel):
+    """
+    BE-018: Schema for creating executor category access
+    
+    Used for POST /users/{user_id}/category-access endpoint.
+    Allows adding multiple categories at once.
+    """
+    category_ids: list[str] = Field(..., min_length=1, description="List of category UUIDs to grant access to")
+    
+    @field_validator('category_ids')
+    @classmethod
+    def validate_category_ids(cls, v: list[str]) -> list[str]:
+        """Validate that all category_ids are valid UUIDs"""
+        for category_id in v:
+            try:
+                UUID(category_id)
+            except ValueError:
+                raise ValueError(f"Invalid UUID: {category_id}")
+        return v
+
+
+class CategoryAccessUpdate(BaseModel):
+    """
+    BE-018: Schema for replacing all executor category access
+    
+    Used for PUT /users/{user_id}/category-access endpoint.
+    Replaces all existing category access with new list.
+    """
+    category_ids: list[str] = Field(..., description="List of category UUIDs (replaces all existing)")
+    
+    @field_validator('category_ids')
+    @classmethod
+    def validate_category_ids(cls, v: list[str]) -> list[str]:
+        """Validate that all category_ids are valid UUIDs"""
+        for category_id in v:
+            try:
+                UUID(category_id)
+            except ValueError:
+                raise ValueError(f"Invalid UUID: {category_id}")
+        return v
+
+
+class CategoryAccessResponse(BaseModel):
+    """
+    BE-018: Schema for executor category access response
+    
+    Returns detailed information about category access record.
+    """
+    id: str  # UUID as string
+    executor_id: str  # UUID as string
+    category_id: str  # UUID as string
+    category_name: Optional[str] = None  # Populated from join
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ExecutorCategoriesListResponse(BaseModel):
+    """
+    BE-018: Schema for listing executor's category access
+    
+    Used for GET /users/{user_id}/category-access endpoint.
+    Returns list of categories the executor has access to.
+    """
+    executor_id: str  # UUID as string
+    executor_username: str
+    total: int = Field(..., description="Total number of categories executor has access to")
+    categories: list[CategoryAccessResponse] = Field(..., description="List of category access records")
+
+
+class CategoryAccessBulkDeleteResponse(BaseModel):
+    """
+    BE-018: Schema for bulk category access deletion response
+    
+    Returns information about deleted access records.
+    """
+    message: str
+    executor_id: str
+    deleted_count: int
+    category_ids: list[str] = Field(..., description="List of category UUIDs that were removed")
+
