@@ -76,9 +76,10 @@ const CasesPage: React.FC = () => {
   const error = useAppSelector(selectCasesError);
   const total = useAppSelector(selectCasesTotal);
 
-  // Список категорій для фільтру
+  // FE-013: Список категорій для фільтру (враховує доступи для EXECUTOR)
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [hasNoAccess, setHasNoAccess] = useState(false); // FE-013: Чи немає доступів до категорій
 
   // Стан фільтрів
   const [filters, setFilters] = useState({
@@ -106,35 +107,74 @@ const CasesPage: React.FC = () => {
     order: 'descend' as 'ascend' | 'descend',
   });
 
-  // Завантаження категорій при монтажі
+  // FE-013: Завантаження категорій з урахуванням доступів для EXECUTOR
   useEffect(() => {
     const fetchCategories = async () => {
+      if (!user) return;
+
       setLoadingCategories(true);
+      setHasNoAccess(false);
+
       try {
-        const response = await api.get('/api/categories', {
-          params: { is_active: true }
-        });
-        // API може повертати масив або об'єкт з масивом
-        const data = response.data;
-        if (Array.isArray(data)) {
-          setCategories(data);
-        } else if (data && Array.isArray(data.categories)) {
-          setCategories(data.categories);
+        // FE-013: Для EXECUTOR отримуємо доступні категорії через /users/me/category-access
+        if (user.role === 'EXECUTOR') {
+          const accessResponse = await api.get('/api/users/me/category-access');
+          const accessData = accessResponse.data;
+
+          if (accessData.total === 0) {
+            // Немає доступів до жодної категорії
+            setCategories([]);
+            setHasNoAccess(true);
+          } else {
+            // Маємо доступ до певних категорій - завантажуємо деталі
+            const categoryIds = accessData.categories.map((c: any) => c.category_id);
+            
+            // Отримуємо повну інформацію про категорії
+            const categoriesResponse = await api.get('/api/categories', {
+              params: { is_active: true }
+            });
+
+            const allCategories = Array.isArray(categoriesResponse.data)
+              ? categoriesResponse.data
+              : categoriesResponse.data.categories || [];
+
+            // Фільтруємо тільки доступні категорії
+            const accessibleCategories = allCategories.filter((cat: Category) =>
+              categoryIds.includes(cat.id)
+            );
+
+            setCategories(accessibleCategories);
+            setHasNoAccess(false);
+          }
         } else {
-          console.warn('Unexpected categories response format:', data);
-          setCategories([]);
+          // Для ADMIN та OPERATOR показуємо всі категорії
+          const response = await api.get('/api/categories', {
+            params: { is_active: true }
+          });
+          
+          const data = response.data;
+          if (Array.isArray(data)) {
+            setCategories(data);
+          } else if (data && Array.isArray(data.categories)) {
+            setCategories(data.categories);
+          } else {
+            console.warn('Unexpected categories response format:', data);
+            setCategories([]);
+          }
+          setHasNoAccess(false);
         }
       } catch (err) {
         console.error('Failed to load categories:', err);
         message.error('Помилка завантаження категорій');
         setCategories([]);
+        setHasNoAccess(false);
       } finally {
         setLoadingCategories(false);
       }
     };
 
     fetchCategories();
-  }, []);
+  }, [user]);
 
   // Завантаження даних
   const loadCases = () => {
@@ -349,6 +389,23 @@ const CasesPage: React.FC = () => {
             + Створити звернення
           </Button>
         </div>
+
+        {/* FE-013: Повідомлення про відсутність доступів до категорій для EXECUTOR */}
+        {hasNoAccess && user?.role === 'EXECUTOR' && (
+          <Card style={{ marginBottom: 24, borderColor: '#ff4d4f' }}>
+            <div style={{ textAlign: 'center', padding: '24px' }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+              <Title level={3} style={{ color: '#ff4d4f', marginBottom: '8px' }}>
+                У вас немає доступу до категорій
+              </Title>
+              <p style={{ fontSize: '16px', color: '#666', marginBottom: 0 }}>
+                Зверніться до адміністратора для надання доступу до категорій звернень.
+                <br />
+                Без доступу до категорій ви не зможете переглядати та обробляти звернення.
+              </p>
+            </div>
+          </Card>
+        )}
 
         {/* Фільтри */}
         <Card style={{ marginBottom: 24 }}>

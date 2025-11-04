@@ -88,8 +88,14 @@ const ChangeStatusForm: React.FC<ChangeStatusFormProps> = ({
       onSuccess(); // Перезавантажити дані
     } catch (err: any) {
       console.error('Failed to change status:', err);
-      const errorMessage = err.response?.data?.detail || 'Помилка при зміні статусу';
-      message.error(errorMessage);
+      
+      // FE-013: Обробка помилки 403 - немає доступу до категорії звернення
+      if (err.response?.status === 403) {
+        message.error('У вас немає доступу до категорії цього звернення');
+      } else {
+        const errorMessage = err.response?.data?.detail || 'Помилка при зміні статусу';
+        message.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

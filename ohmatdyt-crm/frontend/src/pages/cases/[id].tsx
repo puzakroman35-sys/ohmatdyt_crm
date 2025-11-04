@@ -61,7 +61,7 @@ const CaseDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Функція для завантаження деталей звернення
+  // FE-013: Функція для завантаження деталей звернення з обробкою 403
   const fetchCaseDetail = async () => {
     if (!id || !user) return;
 
@@ -72,7 +72,18 @@ const CaseDetailPage: React.FC = () => {
       setCaseDetail(response.data);
     } catch (err: any) {
       console.error('Failed to load case details:', err);
-      setError(err.response?.data?.detail || 'Помилка завантаження деталей звернення');
+      
+      // FE-013: Обробка помилки 403 - немає доступу до категорії звернення
+      if (err.response?.status === 403) {
+        message.error('У вас немає доступу до цього звернення');
+        // Редирект на сторінку списку звернень
+        setTimeout(() => {
+          router.push('/cases');
+        }, 1500);
+        setError('У вас немає доступу до цього звернення. Перенаправлення на список звернень...');
+      } else {
+        setError(err.response?.data?.detail || 'Помилка завантаження деталей звернення');
+      }
     } finally {
       setLoading(false);
     }

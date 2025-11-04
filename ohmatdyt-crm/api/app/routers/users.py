@@ -161,6 +161,59 @@ async def get_current_user_info(
     )
 
 
+@router.get("/me/category-access", response_model=schemas.ExecutorCategoriesListResponse)
+async def get_my_category_access(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    FE-013: Отримати список категорій до яких має доступ поточний користувач.
+    
+    **Response:**
+    - executor_id: UUID поточного користувача
+    - executor_username: Ім'я користувача
+    - total: Загальна кількість категорій з доступом
+    - categories: Список категорій з деталями доступу
+    
+    **Errors:**
+    - 401: Не авторизований
+    
+    **Note:**
+    - Для EXECUTOR: повертає тільки категорії до яких має явний доступ
+    - Для ADMIN/OPERATOR: повертає порожній список (вони мають доступ до всіх категорій)
+    """
+    # Для ADMIN та OPERATOR повертаємо порожній список (вони бачать все)
+    if current_user.role in [models.UserRole.ADMIN, models.UserRole.OPERATOR]:
+        return {
+            "executor_id": str(current_user.id),
+            "executor_username": current_user.username,
+            "total": 0,
+            "categories": []
+        }
+    
+    # Для EXECUTOR отримуємо доступні категорії
+    access_records = crud.get_executor_category_access(db=db, executor_id=current_user.id)
+    
+    # Формування відповіді
+    categories_response = []
+    for access in access_records:
+        categories_response.append(schemas.CategoryAccessResponse(
+            id=str(access.id),
+            executor_id=str(access.executor_id),
+            category_id=str(access.category_id),
+            category_name=access.category.name if access.category else None,
+            created_at=access.created_at,
+            updated_at=access.updated_at
+        ))
+    
+    return {
+        "executor_id": str(current_user.id),
+        "executor_username": current_user.username,
+        "total": len(categories_response),
+        "categories": categories_response
+    }
+
+
 @router.get("/{user_id}", response_model=schemas.UserResponse)
 async def get_user(
     user_id: str,

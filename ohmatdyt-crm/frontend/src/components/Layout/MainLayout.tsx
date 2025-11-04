@@ -20,6 +20,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectUser, logout } from '@/store/slices/authSlice';
+import ExecutorCategoryBadge from '@/components/ExecutorCategoryBadge'; // FE-013
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -127,6 +128,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           selectedKeys={selectedKeys}
           items={sideMenuItems}
         />
+
+        {/* FE-013: Індикатор доступних категорій для EXECUTOR */}
+        <div style={{ position: 'absolute', bottom: 60, left: 0, right: 0 }}>
+          <ExecutorCategoryBadge />
+        </div>
       </Sider>
 
       <Layout>
