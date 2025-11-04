@@ -205,8 +205,8 @@ const AssignExecutorForm: React.FC<AssignExecutorFormProps> = ({
                   optionFilterProp="children"
                   allowClear
                   filterOption={(input, option) => {
-                    const label = option?.label || '';
-                    return String(label).toLowerCase().includes(input.toLowerCase());
+                    const children = option?.children || '';
+                    return String(children).toLowerCase().includes(input.toLowerCase());
                   }}
                 >
                   {executors.map((executor) => (
