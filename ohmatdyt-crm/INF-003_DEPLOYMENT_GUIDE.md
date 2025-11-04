@@ -5,7 +5,9 @@
 
 **Задача:** INF-003 - Nginx prod-конфіг + HTTPS (Let's Encrypt)  
 **Статус:** Готово до розгортання  
-**Production сервер:** rpuzak@192.168.31.248  
+## Налаштування
+
+**Production сервер:** rpuzak@192.168.31.249  
 **Директорія:** /home/rpuzak/ohmatdyt-crm/  
 
 ## Файли для розгортання
@@ -83,18 +85,18 @@
 
 ```bash
 # З локальної машини (Windows PowerShell)
-scp ohmatdyt-crm/nginx/nginx.prod.conf rpuzak@192.168.31.248:/home/rpuzak/ohmatdyt-crm/nginx/
-scp ohmatdyt-crm/nginx/generate-ssl-certs.sh rpuzak@192.168.31.248:/home/rpuzak/ohmatdyt-crm/nginx/
-scp ohmatdyt-crm/nginx/setup-letsencrypt.sh rpuzak@192.168.31.248:/home/rpuzak/ohmatdyt-crm/nginx/
-scp ohmatdyt-crm/nginx/README.md rpuzak@192.168.31.248:/home/rpuzak/ohmatdyt-crm/nginx/
-scp ohmatdyt-crm/docker-compose.prod.yml rpuzak@192.168.31.248:/home/rpuzak/ohmatdyt-crm/
+scp ohmatdyt-crm/nginx/nginx.prod.conf rpuzak@192.168.31.249:/home/rpuzak/ohmatdyt-crm/nginx/
+scp ohmatdyt-crm/nginx/generate-ssl-certs.sh rpuzak@192.168.31.249:/home/rpuzak/ohmatdyt-crm/nginx/
+scp ohmatdyt-crm/nginx/setup-letsencrypt.sh rpuzak@192.168.31.249:/home/rpuzak/ohmatdyt-crm/nginx/
+scp ohmatdyt-crm/nginx/README.md rpuzak@192.168.31.249:/home/rpuzak/ohmatdyt-crm/nginx/
+scp ohmatdyt-crm/docker-compose.prod.yml rpuzak@192.168.31.249:/home/rpuzak/ohmatdyt-crm/
 ```
 
 #### Крок 2: Генерація SSL сертифікатів
 
 ```bash
 # SSH на сервер
-ssh rpuzak@192.168.31.248
+ssh rpuzak@192.168.31.249
 
 # Перейти в nginx директорію
 cd /home/rpuzak/ohmatdyt-crm/nginx
@@ -131,11 +133,11 @@ docker logs ohmatdyt-crm-nginx-1
 
 ```bash
 # З сервера або локально
-curl -k https://192.168.31.248/
-curl -I https://192.168.31.248/api/health/
+curl -k https://192.168.31.249/
+curl -I https://192.168.31.249/api/health/
 
 # Перевірка редіректу HTTP → HTTPS
-curl -I http://192.168.31.248/
+curl -I http://192.168.31.249/
 # Повинен повернути 301 redirect на https://
 ```
 
@@ -157,7 +159,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml restart nginx
 ### 1. HTTPS доступність
 
 ```bash
-curl -k https://192.168.31.248/
+curl -k https://192.168.31.249/
 ```
 
 Очікуваний результат: HTML головної сторінки
@@ -165,7 +167,7 @@ curl -k https://192.168.31.248/
 ### 2. API endpoint
 
 ```bash
-curl -I https://192.168.31.248/api/health/
+curl -I https://192.168.31.249/api/health/
 ```
 
 Очікуваний результат: HTTP 200 OK
@@ -173,7 +175,7 @@ curl -I https://192.168.31.248/api/health/
 ### 3. HTTP → HTTPS redirect
 
 ```bash
-curl -I http://192.168.31.248/
+curl -I http://192.168.31.249/
 ```
 
 Очікуваний результат: HTTP 301 Moved Permanently → https://
@@ -181,7 +183,7 @@ curl -I http://192.168.31.248/
 ### 4. Security headers
 
 ```bash
-curl -I https://192.168.31.248/ | grep -E "(Strict-Transport-Security|X-Frame-Options|X-Content-Type-Options)"
+curl -I https://192.168.31.249/ | grep -E "(Strict-Transport-Security|X-Frame-Options|X-Content-Type-Options)"
 ```
 
 Очікуваний результат:
@@ -194,7 +196,7 @@ X-Content-Type-Options: nosniff
 ### 5. Gzip compression
 
 ```bash
-curl -I -H "Accept-Encoding: gzip" https://192.168.31.248/
+curl -I -H "Accept-Encoding: gzip" https://192.168.31.249/
 ```
 
 Очікуваний результат: `Content-Encoding: gzip`
@@ -202,7 +204,7 @@ curl -I -H "Accept-Encoding: gzip" https://192.168.31.248/
 ### 6. Static files caching
 
 ```bash
-curl -I https://192.168.31.248/static/test.css
+curl -I https://192.168.31.249/static/test.css
 ```
 
 Очікуваний результат: `Cache-Control: public, max-age=2592000`
@@ -211,7 +213,7 @@ curl -I https://192.168.31.248/static/test.css
 
 ```bash
 # Виконати 15 запитів підряд
-for i in {1..15}; do curl -I https://192.168.31.248/api/health/; done
+for i in {1..15}; do curl -I https://192.168.31.249/api/health/; done
 ```
 
 Очікуваний результат: Після 10 запитів - HTTP 429 Too Many Requests
@@ -228,7 +230,7 @@ docker logs ohmatdyt-crm-nginx-1 --tail 50
 ### 9. SSL сертифікат
 
 ```bash
-openssl s_client -connect 192.168.31.248:443 -showcerts
+openssl s_client -connect 192.168.31.249:443 -showcerts
 ```
 
 Очікуваний результат: Деталі SSL сертифікату
@@ -236,7 +238,7 @@ openssl s_client -connect 192.168.31.248:443 -showcerts
 ### 10. WebSocket підтримка
 
 ```bash
-curl -I -H "Connection: Upgrade" -H "Upgrade: websocket" https://192.168.31.248/ws/
+curl -I -H "Connection: Upgrade" -H "Upgrade: websocket" https://192.168.31.249/ws/
 ```
 
 ## Перевірка Definition of Done (DoD)
@@ -403,7 +405,7 @@ INF-003: Nginx prod-конфіг + HTTPS (Let's Encrypt)
 ## Контакти & Підтримка
 
 **Production сервер:**
-- IP: 192.168.31.248
+- IP: 192.168.31.249
 - User: rpuzak
 - Password: cgf34R
 - Directory: /home/rpuzak/ohmatdyt-crm/

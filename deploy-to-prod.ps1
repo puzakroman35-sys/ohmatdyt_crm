@@ -1,8 +1,8 @@
 # INF-003: Production Deployment Script
-# Deploy to production server: rpuzak@192.168.31.248
+# Deploy to production server: rpuzak@192.168.31.249
 # Password: cgf34R
 
-$SERVER = "rpuzak@192.168.31.248"
+$SERVER = "rpuzak@192.168.31.249"
 $REMOTE_DIR = "ohmatdyt"
 $PASSWORD = "cgf34R"
 

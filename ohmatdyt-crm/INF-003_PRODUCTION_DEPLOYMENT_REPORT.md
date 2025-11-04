@@ -259,7 +259,7 @@ http://git.adelina.com.ua/rpuzak/ohmatdyt.git
 ### Server Details
 
 **Production сервер:**
-- **IP:** 192.168.31.248
+- **IP:** 192.168.31.249
 - **User:** rpuzak
 - **Password:** cgf34R
 - **Directory:** /home/rpuzak/ohmatdyt-crm/
@@ -285,17 +285,17 @@ cd d:\AI_boost\ohmatdyt_crm
 
 #### Step 1: Copy files to server
 ```powershell
-scp ohmatdyt-crm/nginx/nginx.prod.conf rpuzak@192.168.31.248:/home/rpuzak/ohmatdyt-crm/nginx/
-scp ohmatdyt-crm/nginx/generate-ssl-certs.sh rpuzak@192.168.31.248:/home/rpuzak/ohmatdyt-crm/nginx/
-scp ohmatdyt-crm/nginx/setup-letsencrypt.sh rpuzak@192.168.31.248:/home/rpuzak/ohmatdyt-crm/nginx/
-scp ohmatdyt-crm/nginx/README.md rpuzak@192.168.31.248:/home/rpuzak/ohmatdyt-crm/nginx/
-scp ohmatdyt-crm/docker-compose.prod.yml rpuzak@192.168.31.248:/home/rpuzak/ohmatdyt-crm/
+scp ohmatdyt-crm/nginx/nginx.prod.conf rpuzak@192.168.31.249:/home/rpuzak/ohmatdyt-crm/nginx/
+scp ohmatdyt-crm/nginx/generate-ssl-certs.sh rpuzak@192.168.31.249:/home/rpuzak/ohmatdyt-crm/nginx/
+scp ohmatdyt-crm/nginx/setup-letsencrypt.sh rpuzak@192.168.31.249:/home/rpuzak/ohmatdyt-crm/nginx/
+scp ohmatdyt-crm/nginx/README.md rpuzak@192.168.31.249:/home/rpuzak/ohmatdyt-crm/nginx/
+scp ohmatdyt-crm/docker-compose.prod.yml rpuzak@192.168.31.249:/home/rpuzak/ohmatdyt-crm/
 # Password: cgf34R (for each file)
 ```
 
 #### Step 2: SSH to server and generate certificates
 ```bash
-ssh rpuzak@192.168.31.248
+ssh rpuzak@192.168.31.249
 # Password: cgf34R
 
 cd /home/rpuzak/ohmatdyt-crm/nginx
@@ -317,19 +317,19 @@ docker compose ps
 #### Step 4: Test HTTPS
 ```bash
 # HTTP → HTTPS redirect
-curl -I http://192.168.31.248/
+curl -I http://192.168.31.249/
 # Expected: HTTP/1.1 301 Moved Permanently
 
 # HTTPS availability
-curl -k https://192.168.31.248/
+curl -k https://192.168.31.249/
 # Expected: HTML content
 
 # API health check
-curl -k https://192.168.31.248/api/health/
+curl -k https://192.168.31.249/api/health/
 # Expected: {"status":"ok","...}
 
 # Security headers
-curl -I https://192.168.31.248/ | grep -E "(Strict-Transport-Security|X-Frame-Options)"
+curl -I https://192.168.31.249/ | grep -E "(Strict-Transport-Security|X-Frame-Options)"
 # Expected: HSTS and X-Frame-Options headers present
 
 exit
@@ -425,7 +425,7 @@ exit
 ### ⚠️ Production Deployment (30%)
 
 - [x] Deployment scripts створені (deploy-inf003.ps1)
-- [x] Production server підключено (192.168.31.248)
+- [x] Production server підключено (192.168.31.249)
 - [x] SSH credentials валідні (rpuzak / cgf34R)
 - [x] Server directory verified (/home/rpuzak/ohmatdyt-crm/)
 - [ ] Файли скопійовані на production (IN PROGRESS)
@@ -540,8 +540,8 @@ docker logs ohmatdyt-crm-nginx-1
 
 **Діагностика:**
 ```bash
-curl -I https://192.168.31.248/
-openssl s_client -connect 192.168.31.248:443
+curl -I https://192.168.31.249/
+openssl s_client -connect 192.168.31.249:443
 ```
 
 **Можливі причини:**

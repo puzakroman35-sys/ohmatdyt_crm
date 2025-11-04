@@ -511,7 +511,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile letsen
 #### 8. Production Deployment - COMPLETED ✅
 
 **Production сервер:**
-- IP: 192.168.31.248
+- IP: 192.168.31.249
 - User: rpuzak
 - Directory: /home/rpuzak/ohmatdyt-crm/
 
@@ -540,14 +540,14 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile letsen
 
 **✅ HTTP → HTTPS Redirect Test:**
 ```bash
-curl -I http://192.168.31.248/
+curl -I http://192.168.31.249/
 # HTTP/1.1 301 Moved Permanently
-# Location: https://192.168.31.248/
+# Location: https://192.168.31.249/
 ```
 
 **✅ HTTPS Availability Test:**
 ```bash
-curl -k -I https://192.168.31.248/api/health/
+curl -k -I https://192.168.31.249/api/health/
 # HTTP/2 307
 # server: nginx
 # strict-transport-security: max-age=31536000; includeSubDomains
@@ -577,7 +577,7 @@ docker ps
 - **Issue Fixed:** `${nginx_server_name}` variable substitution в redirect Location header
 - **Solution:** Замінено `server_name ${NGINX_SERVER_NAME}` на `server_name _` (wildcard)
 - **Solution:** Замінено `return 301 https://$server_name$request_uri` на `return 301 https://$host$request_uri`
-- **Result:** Redirect тепер показує правильний URL: `Location: https://192.168.31.248/`
+- **Result:** Redirect тепер показує правильний URL: `Location: https://192.168.31.249/`
 - **Git Commit:** 1269be3 (fix: nginx redirect location header)
 
 **Current Status:**
@@ -612,7 +612,7 @@ docker ps
   - Замінено `server_name ${NGINX_SERVER_NAME}` на `server_name _` (wildcard)
   - Замінено `return 301 https://$server_name$request_uri` на `return 301 https://$host$request_uri`
 - **Status:** ✅ Resolved
-- **Verification:** `curl -I http://192.168.31.248/` тепер показує `Location: https://192.168.31.248/`
+- **Verification:** `curl -I http://192.168.31.249/` тепер показує `Location: https://192.168.31.249/`
 
 **Production Ready Checklist:**
 - ✅ Nginx production config deployed
@@ -657,9 +657,9 @@ docker ps
 - **Total:** 3536+ insertions, 15 files modified/created
 
 **Production URL:**
-- HTTP: http://192.168.31.248/ (redirects to HTTPS)
-- HTTPS: https://192.168.31.248/ (active with self-signed certificate)
-- API Health: https://192.168.31.248/api/health/
+- HTTP: http://192.168.31.249/ (redirects to HTTPS)
+- HTTPS: https://192.168.31.249/ (active with self-signed certificate)
+- API Health: https://192.168.31.249/api/health/
 
 **Status:** ✅ INF-003 PRODUCTION DEPLOYMENT COMPLETE (100%)
 

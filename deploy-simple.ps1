@@ -1,5 +1,5 @@
 # Простий скрипт розгортання
-$SERVER = "rpuzak@192.168.31.248"
+$SERVER = "rpuzak@192.168.31.249"
 
 Write-Host "=== Розгортання Ohmatdyt CRM ===" -ForegroundColor Green
 
@@ -52,8 +52,8 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps
 
 echo ''
 echo '✓ Розгортання завершено!'
-echo '  URL: http://192.168.31.248'
-echo '  API Docs: http://192.168.31.248/api/docs'
+echo '  URL: http://192.168.31.249'
+echo '  API Docs: http://192.168.31.249/api/docs'
 "@
 
 Write-Host "`n=== Готово! ===" -ForegroundColor Green

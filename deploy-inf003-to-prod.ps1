@@ -4,7 +4,7 @@
 # Description: Розгортання Nginx production конфігурації з HTTPS на production сервер
 
 param(
-    [string]$Server = "rpuzak@192.168.31.248",
+    [string]$Server = "rpuzak@192.168.31.249",
     [string]$RemoteDir = "/home/rpuzak/ohmatdyt-crm"
 )
 
@@ -136,8 +136,8 @@ Write-Host "   docker compose -f docker-compose.yml -f docker-compose.prod.yml d
 Write-Host "   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d nginx`n" -ForegroundColor White
 
 Write-Host "4. Перевірте HTTPS:" -ForegroundColor Cyan
-Write-Host "   curl -k https://192.168.31.248/" -ForegroundColor White
-Write-Host "   curl -I https://192.168.31.248/api/health/`n" -ForegroundColor White
+Write-Host "   curl -k https://192.168.31.249/" -ForegroundColor White
+Write-Host "   curl -I https://192.168.31.249/api/health/`n" -ForegroundColor White
 
 Write-Host "5. (Опціонально) Встановіть Let's Encrypt:" -ForegroundColor Cyan
 Write-Host "   cd nginx" -ForegroundColor White

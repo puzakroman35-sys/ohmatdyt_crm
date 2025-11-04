@@ -1,5 +1,5 @@
 # Скрипт для розгортання на продакшн сервер
-$SERVER = "rpuzak@192.168.31.248"
+$SERVER = "rpuzak@192.168.31.249"
 $PROJECT_DIR = "~/ohmatdyt_crm"
 
 Write-Host "=== Розгортання Ohmatdyt CRM на продакшн ===" -ForegroundColor Green
@@ -80,8 +80,8 @@ docker-compose ps
 
 echo ''
 echo '=== Розгортання завершено! ==='
-echo 'Доступ до додатку: http://192.168.31.248'
-echo 'API документація: http://192.168.31.248/api/docs'
+echo 'Доступ до додатку: http://192.168.31.249'
+echo 'API документація: http://192.168.31.249/api/docs'
 echo ''
 echo 'Корисні команди:'
 echo '  docker-compose logs -f      # Перегляд логів'
@@ -95,4 +95,4 @@ ssh $SERVER $commands
 Remove-Item ohmatdyt-crm.tar.gz -ErrorAction SilentlyContinue
 
 Write-Host "`n=== Готово! ===" -ForegroundColor Green
-Write-Host "Проект розгорнуто на http://192.168.31.248" -ForegroundColor Cyan
+Write-Host "Проект розгорнуто на http://192.168.31.249" -ForegroundColor Cyan

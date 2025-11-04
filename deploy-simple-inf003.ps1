@@ -5,7 +5,8 @@ Write-Host "`n╔═════════════════════
 Write-Host "║         INF-003 Production Deployment (Simple)              ║" -ForegroundColor Cyan
 Write-Host "╚══════════════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
 
-$server = "rpuzak@192.168.31.248"
+# Variables
+$server = "rpuzak@192.168.31.249"
 $password = "cgf34R"
 
 Write-Host "[INFO] Сервер: $server" -ForegroundColor Yellow
@@ -79,8 +80,8 @@ Write-Host ""
 
 # Крок 5: Перевірка
 Write-Host "`n[STEP 5] Перевірка HTTPS..." -ForegroundColor Cyan
-Write-Host "curl -k https://192.168.31.248/" -ForegroundColor White
-Write-Host "curl -I https://192.168.31.248/api/health/" -ForegroundColor White
+Write-Host "curl -k https://192.168.31.249/" -ForegroundColor White
+Write-Host "curl -I https://192.168.31.249/api/health/" -ForegroundColor White
 Write-Host ""
 
 # Автоматичне копіювання (якщо потрібно)

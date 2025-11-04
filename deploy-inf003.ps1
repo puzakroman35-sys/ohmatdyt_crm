@@ -5,7 +5,8 @@ Write-Host "`n============================================================" -For
 Write-Host "  INF-003 Production Deployment Script" -ForegroundColor Cyan
 Write-Host "============================================================`n" -ForegroundColor Cyan
 
-$server = "rpuzak@192.168.31.248"
+# Variables
+$server = "rpuzak@192.168.31.249"
 $remoteDir = "/home/rpuzak/ohmatdyt-crm"
 
 Write-Host "[INFO] Server: $server" -ForegroundColor Yellow
@@ -65,8 +66,8 @@ Write-Host "exit" -ForegroundColor White
 Write-Host ""
 
 Write-Host "# 4. Test HTTPS" -ForegroundColor Gray
-Write-Host "curl -k https://192.168.31.248/" -ForegroundColor White
-Write-Host "curl -I https://192.168.31.248/api/health/" -ForegroundColor White
+Write-Host "curl -k https://192.168.31.249/" -ForegroundColor White
+Write-Host "curl -I https://192.168.31.249/api/health/" -ForegroundColor White
 Write-Host ""
 
 Write-Host "`n============================================================" -ForegroundColor Cyan
