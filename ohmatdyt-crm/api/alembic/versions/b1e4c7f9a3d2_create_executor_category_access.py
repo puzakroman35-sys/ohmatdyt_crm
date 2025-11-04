@@ -27,9 +27,10 @@ def upgrade() -> None:
     Each executor-category pair must be unique.
     """
     # Create executor_category_access table
+    # Note: index=True in Column definitions will automatically create indexes
     op.create_table(
         'executor_category_access',
-        sa.Column('id', UUID(as_uuid=True), primary_key=True),
+        sa.Column('id', UUID(as_uuid=True), primary_key=True, index=True),
         sa.Column('executor_id', UUID(as_uuid=True), nullable=False, index=True),
         sa.Column('category_id', UUID(as_uuid=True), nullable=False, index=True),
         sa.Column('created_at', sa.DateTime, nullable=False),
@@ -45,41 +46,14 @@ def upgrade() -> None:
         'executor_category_access',
         ['executor_id', 'category_id']
     )
-    
-    # Create indexes for fast lookups
-    # Index on executor_id for queries like "get all categories for this executor"
-    op.create_index(
-        'ix_executor_category_access_executor_id',
-        'executor_category_access',
-        ['executor_id']
-    )
-    
-    # Index on category_id for queries like "get all executors who have access to this category"
-    op.create_index(
-        'ix_executor_category_access_category_id',
-        'executor_category_access',
-        ['category_id']
-    )
-    
-    # Index on id for primary key lookups
-    op.create_index(
-        'ix_executor_category_access_id',
-        'executor_category_access',
-        ['id']
-    )
 
 
 def downgrade() -> None:
     """
     BE-018: Drop executor_category_access table
     """
-    # Drop indexes
-    op.drop_index('ix_executor_category_access_id', table_name='executor_category_access')
-    op.drop_index('ix_executor_category_access_category_id', table_name='executor_category_access')
-    op.drop_index('ix_executor_category_access_executor_id', table_name='executor_category_access')
-    
     # Drop unique constraint
     op.drop_constraint('uq_executor_category_access_executor_category', 'executor_category_access', type_='unique')
     
-    # Drop table
+    # Drop table (indexes will be dropped automatically)
     op.drop_table('executor_category_access')

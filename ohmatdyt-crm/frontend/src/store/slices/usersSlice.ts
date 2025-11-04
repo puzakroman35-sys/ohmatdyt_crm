@@ -41,6 +41,27 @@ export interface UpdateUserData {
   executor_category_ids?: string[];
 }
 
+// FE-012: Типи для управління доступом до категорій
+export interface CategoryAccess {
+  id: string;
+  executor_id: string;
+  category_id: string;
+  category_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CategoryAccessListResponse {
+  executor_id: string;
+  executor_username: string;
+  total: number;
+  categories: CategoryAccess[];
+}
+
+export interface CategoryAccessUpdate {
+  category_ids: string[];
+}
+
 export interface UsersFilters {
   role?: UserRole;
   is_active?: boolean;
@@ -241,6 +262,38 @@ export const fetchUserActiveCasesAsync = createAsyncThunk(
   }
 );
 
+// FE-012: Отримати список категорій до яких має доступ виконавець
+export const fetchCategoryAccessAsync = createAsyncThunk(
+  'users/fetchCategoryAccess',
+  async (userId: string, { rejectWithValue }) => {
+    try {
+      const response = await api.get(`/api/users/${userId}/category-access`);
+      return response.data as CategoryAccessListResponse;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || 'Помилка завантаження доступів до категорій');
+    }
+  }
+);
+
+// FE-012: Оновити доступ виконавця до категорій (заміна всіх)
+export const updateCategoryAccessAsync = createAsyncThunk(
+  'users/updateCategoryAccess',
+  async (
+    params: { userId: string; categoryIds: string[] },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await api.put(
+        `/api/users/${params.userId}/category-access`,
+        { category_ids: params.categoryIds }
+      );
+      return response.data as CategoryAccessListResponse;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || 'Помилка оновлення доступів до категорій');
+    }
+  }
+);
+
 // Slice
 const usersSlice = createSlice({
   name: 'users',
@@ -416,6 +469,34 @@ const usersSlice = createSlice({
         state.isLoading = false;
       })
       .addCase(fetchUserActiveCasesAsync.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // FE-012: Fetch Category Access
+    builder
+      .addCase(fetchCategoryAccessAsync.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchCategoryAccessAsync.fulfilled, (state) => {
+        state.isLoading = false;
+      })
+      .addCase(fetchCategoryAccessAsync.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // FE-012: Update Category Access
+    builder
+      .addCase(updateCategoryAccessAsync.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateCategoryAccessAsync.fulfilled, (state) => {
+        state.isLoading = false;
+      })
+      .addCase(updateCategoryAccessAsync.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });

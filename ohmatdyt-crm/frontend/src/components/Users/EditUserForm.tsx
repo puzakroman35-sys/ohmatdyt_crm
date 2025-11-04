@@ -1,13 +1,14 @@
 /**
  * Edit User Form Component
- * Ohmatdyt CRM - FE-008
+ * Ohmatdyt CRM - FE-008, FE-012
  */
 
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, Select, Switch, Button, message } from 'antd';
+import { Modal, Form, Input, Select, Switch, Button, message, Divider } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import { useAppDispatch } from '@/store/hooks';
 import { updateUserAsync, UpdateUserData, User, UserRole } from '@/store/slices/usersSlice';
+import CategoryAccessManager from './CategoryAccessManager'; // FE-012
 
 const { Option } = Select;
 
@@ -115,7 +116,7 @@ const EditUserForm: React.FC<EditUserFormProps> = ({
           Зберегти
         </Button>,
       ]}
-      width={600}
+      width={user?.role === 'EXECUTOR' ? 900 : 600} // FE-012: більша ширина для EXECUTOR
       destroyOnClose
     >
       <Form
@@ -223,6 +224,21 @@ const EditUserForm: React.FC<EditUserFormProps> = ({
         >
           <Switch checkedChildren="Так" unCheckedChildren="Ні" />
         </Form.Item>
+
+        {/* FE-012: Секція управління доступами до категорій для EXECUTOR */}
+        {user?.role === 'EXECUTOR' && (
+          <>
+            <Divider />
+            <CategoryAccessManager
+              userId={user.id}
+              userRole={user.role}
+              onAccessChanged={() => {
+                // Опціонально: можна оновити інформацію про користувача
+                console.log('Category access updated for user:', user.id);
+              }}
+            />
+          </>
+        )}
       </Form>
     </Modal>
   );

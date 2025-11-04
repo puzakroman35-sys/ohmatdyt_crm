@@ -1,13 +1,14 @@
 /**
  * Create User Form Component
- * Ohmatdyt CRM - FE-008
+ * Ohmatdyt CRM - FE-008, FE-012
  */
 
 import React, { useState } from 'react';
-import { Modal, Form, Input, Select, Switch, Button, message } from 'antd';
+import { Modal, Form, Input, Select, Switch, Button, message, Divider } from 'antd';
 import { UserAddOutlined } from '@ant-design/icons';
 import { useAppDispatch } from '@/store/hooks';
 import { createUserAsync, CreateUserData, UserRole } from '@/store/slices/usersSlice';
+import CategorySelector from './CategorySelector'; // FE-012
 
 const { Option } = Select;
 
@@ -32,6 +33,8 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({
   const dispatch = useAppDispatch();
   const [form] = Form.useForm();
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole>('OPERATOR'); // FE-012: відстежуємо роль
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]); // FE-012: категорії для EXECUTOR
 
   // Обробка відправки форми
   const handleSubmit = async () => {
@@ -48,10 +51,17 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({
         is_active: values.is_active !== undefined ? values.is_active : true,
       };
 
+      // FE-012: Додаємо категорії для EXECUTOR
+      if (values.role === 'EXECUTOR' && selectedCategoryIds.length > 0) {
+        userData.executor_category_ids = selectedCategoryIds;
+      }
+
       await dispatch(createUserAsync(userData)).unwrap();
       
       message.success('Користувача успішно створено');
       form.resetFields();
+      setSelectedCategoryIds([]); // FE-012: очищаємо категорії
+      setSelectedRole('OPERATOR'); // FE-012: скидаємо роль
       onSuccess();
     } catch (error: any) {
       console.error('Create user error:', error);
@@ -64,7 +74,18 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({
   // Обробка скасування
   const handleCancel = () => {
     form.resetFields();
+    setSelectedCategoryIds([]); // FE-012: очищаємо категорії
+    setSelectedRole('OPERATOR'); // FE-012: скидаємо роль
     onCancel();
+  };
+
+  // FE-012: Обробка зміни ролі
+  const handleRoleChange = (role: UserRole) => {
+    setSelectedRole(role);
+    // Очищаємо категорії при зміні ролі на не-EXECUTOR
+    if (role !== 'EXECUTOR') {
+      setSelectedCategoryIds([]);
+    }
   };
 
   return (
@@ -91,7 +112,7 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({
           Створити
         </Button>,
       ]}
-      width={600}
+      width={selectedRole === 'EXECUTOR' ? 900 : 600} // FE-012: більша ширина для EXECUTOR
       destroyOnClose
     >
       <Form
@@ -188,7 +209,7 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({
           label="Роль"
           rules={[{ required: true, message: 'Будь ласка, виберіть роль' }]}
         >
-          <Select placeholder="Виберіть роль">
+          <Select placeholder="Виберіть роль" onChange={handleRoleChange}>
             {Object.entries(roleLabels).map(([key, label]) => (
               <Option key={key} value={key}>
                 {label}
@@ -204,6 +225,21 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({
         >
           <Switch checkedChildren="Так" unCheckedChildren="Ні" />
         </Form.Item>
+
+        {/* FE-012: Секція вибору категорій для EXECUTOR */}
+        {selectedRole === 'EXECUTOR' && (
+          <>
+            <Divider />
+            <div>
+              <h4>Доступ до категорій</h4>
+              <CategorySelector
+                selectedCategoryIds={selectedCategoryIds}
+                onChange={setSelectedCategoryIds}
+                disabled={isLoading}
+              />
+            </div>
+          </>
+        )}
       </Form>
     </Modal>
   );
