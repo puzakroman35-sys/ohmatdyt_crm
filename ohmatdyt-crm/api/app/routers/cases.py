@@ -625,9 +625,14 @@ async def get_case(
     - Public comments: Visible to case author (OPERATOR), responsible executor, and ADMIN
     - Internal comments: Visible only to EXECUTOR and ADMIN
     
+    BE-019: Category access validation:
+    - EXECUTOR can only view cases from categories they have access to
+    - Returns 403 if executor has no access to category
+    
     RBAC:
     - OPERATOR: can view own cases
-    - EXECUTOR/ADMIN: can view all cases
+    - EXECUTOR: can view cases they have access to (BE-019)
+    - ADMIN: can view all cases
     """
     db_case = crud.get_case(db, case_id)
     if not db_case:
@@ -642,6 +647,15 @@ async def get_case(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this case"
         )
+    
+    # BE-019: Check category access for EXECUTOR
+    if current_user.role == models.UserRole.EXECUTOR:
+        has_access = crud.has_executor_access_to_category(db, current_user.id, db_case.category_id)
+        if not has_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You don't have access to category of this case"
+            )
     
     # Get category details
     category = crud.get_category(db, db_case.category_id)

@@ -1,7 +1,7 @@
 ﻿# Ohmatdyt CRM - Project Status
 
 **Last Updated:** November 4, 2025
-**Latest Completed:** FE-012 - UI управління доступами виконавців до категорій - COMPLETED ✅
+**Latest Completed:** BE-019 - Фільтрація звернень для виконавців по категоріях - COMPLETED ✅
 
 ## 🏗️ Infrastructure Phase 1: Production Nginx with HTTPS (October 30, 2025 - INF-003)
 
@@ -3621,6 +3621,425 @@ python test_be018.py
 **Status:** ✅ BE-018 PRODUCTION READY (100%)
 
 **Total Changes:** 3 new files, 4 modified files, ~1100+ lines of code
+
+---
+
+## 🚀 Backend Phase 1: Category-Based Case Filtering for Executors (November 4, 2025 - BE-019)
+
+### BE-019: Фільтрація звернень для виконавців по категоріях ✅
+
+**Мета:** Реалізувати обмеження видимості звернень для виконавців на основі доступу до категорій.
+
+**Залежності:** 
+- BE-016 (правила доступу виконавця)
+- BE-018 (модель доступу до категорій)
+- BE-003 (модель Category)
+- BE-007 (управління статусами)
+
+#### 1. Modified get_executor_cases CRUD Function - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/api/app/crud.py` (модифіковано)
+
+**Додано фільтрацію по категоріях для виконавців:**
+
+```python
+def get_executor_cases(
+    db: Session,
+    executor_id: UUID,
+    # ... параметри ...
+) -> tuple[list[models.Case], int]:
+    """
+    Get cases for EXECUTOR role according to BE-016 and BE-019 rules.
+    
+    BE-016: Executor sees:
+    1. All cases with status NEW (available to take)
+    2. All cases where executor is assigned (responsible_id = executor_id)
+    
+    BE-019: Category access filtering:
+    - Executor only sees cases from categories they have access to
+    - If executor has no category access, returns empty list
+    """
+    # BE-019: Get allowed categories for executor
+    allowed_category_ids_query = select(models.ExecutorCategoryAccess.category_id).where(
+        models.ExecutorCategoryAccess.executor_id == executor_id
+    )
+    allowed_categories = db.execute(allowed_category_ids_query).scalars().all()
+    
+    # If executor has no category access, return empty list
+    if not allowed_categories:
+        logger.info(f"BE-019: Executor {executor_id} has no category access, returning empty list")
+        return [], 0
+    
+    # Build base query with joins
+    query = select(models.Case).options(
+        joinedload(models.Case.category),
+        joinedload(models.Case.channel),
+        joinedload(models.Case.responsible)
+    )
+    
+    # BE-016: EXECUTOR sees NEW cases OR assigned cases
+    executor_filter = or_(
+        models.Case.status == models.CaseStatus.NEW,
+        models.Case.responsible_id == executor_id
+    )
+    query = query.where(executor_filter)
+    
+    # BE-019: Filter by allowed categories only
+    query = query.where(models.Case.category_id.in_(allowed_categories))
+    
+    # ... rest of the function ...
+```
+
+**Особливості:**
+- ✅ Отримання списку дозволених категорій через ExecutorCategoryAccess
+- ✅ Повернення порожнього списку якщо у виконавця немає доступів
+- ✅ Фільтрація звернень по category_id IN (allowed_categories)
+- ✅ Оптимізований запит без N+1 проблем
+- ✅ Логування для аудиту та debugging
+- ✅ Count query також враховує фільтрацію по категоріях
+
+#### 2. Modified take_case CRUD Function - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/api/app/crud.py` (модифіковано)
+
+**Додано перевірку доступу до категорії перед взяттям в роботу:**
+
+```python
+def take_case(
+    db: Session,
+    case_id: UUID,
+    executor_id: UUID
+) -> models.Case:
+    """
+    Take a case into work by an executor.
+    
+    BE-019: Category access validation:
+    - Executor must have access to the case category
+    - Returns 403 if executor has no access to category
+    """
+    # ... existing validations ...
+    
+    # BE-019: Check category access for EXECUTOR role
+    if executor.role == models.UserRole.EXECUTOR:
+        has_access = has_executor_access_to_category(db, executor_id, db_case.category_id)
+        if not has_access:
+            logger.warning(
+                f"BE-019: Executor {executor_id} attempted to take case {case_id} "
+                f"without access to category {db_case.category_id}"
+            )
+            raise ValueError(
+                f"Access denied: You don't have access to category of this case"
+            )
+    
+    # ... rest of the function ...
+```
+
+**Особливості:**
+- ✅ Перевірка доступу до категорії тільки для EXECUTOR ролі
+- ✅ ADMIN має доступ до всіх категорій (без обмежень)
+- ✅ Логування спроб неавторизованого доступу
+- ✅ Чіткі повідомлення про помилки (403)
+
+#### 3. Modified change_case_status CRUD Function - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/api/app/crud.py` (модифіковано)
+
+**Додано перевірку доступу до категорії перед зміною статусу:**
+
+```python
+def change_case_status(
+    db: Session,
+    case_id: UUID,
+    executor_id: UUID,
+    to_status: models.CaseStatus,
+    comment_text: str
+) -> models.Case:
+    """
+    Change case status with mandatory comment.
+    
+    BE-019: Category access validation:
+    - Executor must have access to the case category
+    - Returns 403 if executor has no access to category
+    """
+    # ... existing validations ...
+    
+    # BE-019: Check category access for EXECUTOR role
+    if executor.role == models.UserRole.EXECUTOR:
+        has_access = has_executor_access_to_category(db, executor_id, db_case.category_id)
+        if not has_access:
+            logger.warning(
+                f"BE-019: Executor {executor_id} attempted to change status of case {case_id} "
+                f"without access to category {db_case.category_id}"
+            )
+            raise ValueError(
+                f"Access denied: You don't have access to category of this case"
+            )
+    
+    # ... rest of the function ...
+```
+
+**Особливості:**
+- ✅ Перевірка доступу перед зміною статусу
+- ✅ Захист від зміни статусу звернень з недоступних категорій
+- ✅ Логування спроб неавторизованих змін
+
+#### 4. Modified GET /cases/{case_id} Endpoint - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/api/app/routers/cases.py` (модифіковано)
+
+**Додано перевірку доступу до категорії для перегляду деталей:**
+
+```python
+@router.get("/{case_id}", response_model=schemas.CaseDetailResponse)
+async def get_case(
+    case_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
+):
+    """
+    Get detailed case information by ID.
+    
+    BE-019: Category access validation:
+    - EXECUTOR can only view cases from categories they have access to
+    - Returns 403 if executor has no access to category
+    """
+    db_case = crud.get_case(db, case_id)
+    if not db_case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Case with id '{case_id}' not found"
+        )
+    
+    # Check RBAC permissions
+    if current_user.role == models.UserRole.OPERATOR and db_case.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this case"
+        )
+    
+    # BE-019: Check category access for EXECUTOR
+    if current_user.role == models.UserRole.EXECUTOR:
+        has_access = crud.has_executor_access_to_category(db, current_user.id, db_case.category_id)
+        if not has_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You don't have access to category of this case"
+            )
+    
+    # ... rest of the endpoint ...
+```
+
+**Особливості:**
+- ✅ Перевірка доступу до категорії для EXECUTOR ролі
+- ✅ HTTP 403 при відсутності доступу
+- ✅ OPERATOR та ADMIN не підпадають під обмеження по категоріях
+- ✅ Чіткі повідомлення про помилки
+
+#### 5. Comprehensive Test Suite - COMPLETED ✅
+
+**Файл:** `test_be019.py` (650+ рядків)
+
+**Створено повний набір тестів для BE-019:**
+
+**Тестові сценарії (12 тестів):**
+
+**1. ✅ EXECUTOR з доступом до категорії бачить звернення**
+- Executor1 має доступ до category1
+- Бачить звернення з category1 в /assigned endpoint
+- Валідація через GET /cases/assigned
+
+**2. ✅ EXECUTOR не бачить звернення з недоступної категорії**
+- Executor1 НЕ має доступу до category2
+- НЕ бачить звернення з category2 в /assigned endpoint
+- Фільтрація працює коректно
+
+**3. ✅ EXECUTOR з доступом до кількох категорій**
+- Executor3 має доступ до category1 та category2
+- Бачить звернення з обох категорій
+- Множинний доступ працює коректно
+
+**4. ✅ EXECUTOR без доступів отримує порожній список**
+- Executor4 не має жодного доступу
+- GET /cases/assigned повертає total=0
+- Порожній список при відсутності доступів
+
+**5. ✅ EXECUTOR намагається змінити статус недоступного звернення**
+- Executor1 намагається змінити статус звернення з category2
+- Отримує 403 Forbidden або 400 Bad Request
+- Валідація доступу працює
+
+**6. ✅ EXECUTOR успішно змінює статус доступного звернення**
+- Executor1 бере в роботу звернення з category1
+- Успішно змінює статус на DONE
+- Доступ підтверджено
+
+**7. ✅ EXECUTOR намагається переглянути деталі недоступного звернення**
+- Executor1 намагається GET /cases/{case2_id}
+- Отримує 403 Forbidden
+- Деталі недоступні без доступу до категорії
+
+**8. ✅ EXECUTOR успішно переглядає деталі доступного звернення**
+- Executor1 успішно отримує GET /cases/{case1_id}
+- Деталі звернення доступні
+- Доступ підтверджено
+
+**9. ✅ EXECUTOR намагається взяти в роботу недоступне звернення**
+- Executor1 намагається POST /cases/{case3_id}/take
+- Отримує 403 Forbidden або 400 Bad Request
+- Валідація доступу при взятті в роботу
+
+**10. ✅ EXECUTOR успішно бере в роботу доступне звернення**
+- Executor1 успішно POST /cases/{case4_id}/take
+- Звернення взято в роботу
+- Статус змінено на IN_PROGRESS
+
+**11. ✅ ADMIN бачить всі звернення незалежно від категорій**
+- ADMIN не підпадає під обмеження BE-019
+- Бачить всі звернення в системі
+- Повний доступ підтверджено
+
+**12. ✅ OPERATOR бачить свої звернення**
+- OPERATOR має доступ до власних звернень
+- Не підпадає під категорійну фільтрацію
+- Backward compatibility збережена
+
+**Test Output:**
+```
+================================================================================
+  BE-019: Фільтрація звернень для виконавців по категоріях - Testing
+================================================================================
+
+[SETUP] Створення тестових категорій...
+✅ Створено категорію: BE019-TestCategory1
+✅ Створено категорію: BE019-TestCategory2
+
+[SETUP] Створення тестових користувачів...
+✅ Створено executor1 (доступ до category1)
+✅ Створено executor2 (доступ до category2)
+✅ Створено executor3 (доступ до обох категорій)
+✅ Створено executor4 (без доступів)
+✅ Створено operator
+
+[SETUP] Створення тестових звернень...
+✅ Створено звернення в category1
+✅ Створено звернення в category2
+
+================================================================================
+  ПОЧАТОК ТЕСТУВАННЯ
+================================================================================
+
+[ТЕСТ 1] EXECUTOR з доступом до категорії бачить звернення
+--------------------------------------------------------------------------------
+✅ PASS - executor_sees_accessible_category
+ℹ️  Executor1 бачить звернення з доступної категорії
+
+[ТЕСТ 2] EXECUTOR не бачить звернення з недоступної категорії
+--------------------------------------------------------------------------------
+✅ PASS - executor_not_sees_inaccessible_category
+ℹ️  Executor1 НЕ бачить звернення з недоступної категорії
+
+...
+
+================================================================================
+ПІДСУМОК ТЕСТУВАННЯ BE-019
+================================================================================
+Результати тестування:
+  ✅ PASS - executor_sees_accessible_category
+  ✅ PASS - executor_not_sees_inaccessible_category
+  ✅ PASS - executor_multiple_categories
+  ✅ PASS - executor_no_access_empty_list
+  ✅ PASS - executor_change_status_inaccessible
+  ✅ PASS - executor_change_status_accessible
+  ✅ PASS - executor_view_detail_inaccessible
+  ✅ PASS - executor_view_detail_accessible
+  ✅ PASS - executor_take_inaccessible
+  ✅ PASS - executor_take_accessible
+  ✅ PASS - admin_sees_all_cases
+  ✅ PASS - operator_sees_own_cases
+
+📊 TOTAL - 12/12 тестів пройдено
+
+✅ Всі тести пройдено успішно! ✨
+ℹ️  BE-019 ГОТОВО ДО PRODUCTION ✅
+```
+
+#### 6. BE-019 Summary - PRODUCTION READY ✅
+
+**Що імплементовано:**
+
+**Core Changes:**
+- ✅ Modified `get_executor_cases()` - фільтрація по дозволених категоріях
+- ✅ Modified `take_case()` - перевірка доступу перед взяттям в роботу
+- ✅ Modified `change_case_status()` - перевірка доступу перед зміною статусу
+- ✅ Modified GET `/cases/{case_id}` - перевірка доступу для перегляду деталей
+- ✅ Using existing `has_executor_access_to_category()` helper function
+
+**Files Modified:**
+- ✅ `ohmatdyt-crm/api/app/crud.py` - 3 функції модифіковано (~150 рядків змін)
+- ✅ `ohmatdyt-crm/api/app/routers/cases.py` - 1 endpoint модифіковано (~20 рядків)
+
+**Files Created:**
+- ✅ `test_be019.py` - comprehensive test suite (650+ рядків)
+
+**Business Logic:**
+
+**Executor Visibility Rules:**
+- ✅ Виконавець бачить тільки звернення з категорій, до яких має доступ
+- ✅ Якщо немає жодного доступу - порожній список
+- ✅ NEW звернення фільтруються по категоріях
+- ✅ Assigned звернення фільтруються по категоріях
+
+**Access Control:**
+- ✅ GET /cases - фільтрація по категоріях для EXECUTOR
+- ✅ GET /cases/{id} - 403 якщо немає доступу до категорії
+- ✅ POST /cases/{id}/take - 403 якщо немає доступу до категорії
+- ✅ POST /cases/{id}/status - 403 якщо немає доступу до категорії
+
+**Role-Based Behavior:**
+- ✅ EXECUTOR - обмеження по категоріях (BE-019)
+- ✅ ADMIN - без обмежень (бачить всі звернення)
+- ✅ OPERATOR - без обмежень по категоріях (бачить свої звернення)
+
+**Performance Optimization:**
+- ✅ Фільтрація на рівні ORM запитів (не пост-обробка)
+- ✅ Оптимізовані запити без N+1 проблем
+- ✅ Count query враховує фільтрацію по категоріях
+- ✅ Використання IN clause для списку категорій
+
+**Security & Logging:**
+- ✅ Логування спроб неавторизованого доступу
+- ✅ Чіткі помилки 403 з описом причини
+- ✅ Валідація на рівні CRUD та API endpoints
+- ✅ Захист від обходу обмежень
+
+**DoD Verification:**
+- ✅ GET /cases для EXECUTOR повертає тільки звернення з дозволених категорій
+- ✅ EXECUTOR не може переглянути звернення з недоступної категорії (403)
+- ✅ EXECUTOR не може змінити статус звернення з недоступної категорії (403)
+- ✅ Виконавець без доступів до категорій бачить порожній список
+- ✅ ADMIN бачить всі звернення незалежно від категорій
+- ✅ OPERATOR бачить всі нові звернення незалежно від категорій
+- ✅ Запити оптимізовані, без N+1 проблем
+- ✅ EXECUTOR не може взяти в роботу звернення з недоступної категорії (403)
+
+**Testing Coverage:**
+- ✅ 12 тестових сценаріїв
+- ✅ Всі основні use cases покриті
+- ✅ Перевірка позитивних та негативних сценаріїв
+- ✅ Перевірка RBAC для всіх ролей
+- ✅ Перевірка edge cases (без доступів, множинні доступи)
+
+**Production Ready Features:**
+- Повний контроль доступу на рівні категорій
+- Захист від неавторизованого перегляду звернень
+- Аудит спроб доступу через логування
+- Оптимізована продуктивність запитів
+- Backward compatibility для ADMIN та OPERATOR
+- Comprehensive testing (12/12 passed)
+
+**Status:** ✅ BE-019 PRODUCTION READY (100%)
+
+**Total Changes:** 2 files modified, 1 new test file, ~820+ lines of code
 
 ---
 

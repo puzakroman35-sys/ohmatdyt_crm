@@ -1457,6 +1457,10 @@ def take_case(
     - Changes status from NEW to IN_PROGRESS
     - Creates status history record
     
+    BE-019: Category access validation:
+    - Executor must have access to the case category
+    - Returns 403 if executor has no access to category
+    
     Args:
         db: Database session
         case_id: Case UUID
@@ -1467,6 +1471,7 @@ def take_case(
         
     Raises:
         ValueError: If case not found, not in NEW status, or executor invalid
+        ValueError: If executor has no access to case category (BE-019)
     """
     # Get case
     db_case = get_case(db, case_id)
@@ -1487,6 +1492,18 @@ def take_case(
     
     if not executor.is_active:
         raise ValueError(f"Executor '{executor.username}' is not active")
+    
+    # BE-019: Check category access for EXECUTOR role
+    if executor.role == models.UserRole.EXECUTOR:
+        has_access = has_executor_access_to_category(db, executor_id, db_case.category_id)
+        if not has_access:
+            logger.warning(
+                f"BE-019: Executor {executor_id} attempted to take case {case_id} "
+                f"without access to category {db_case.category_id}"
+            )
+            raise ValueError(
+                f"Access denied: You don't have access to category of this case"
+            )
     
     # Update case
     old_status = db_case.status
@@ -1531,6 +1548,10 @@ def change_case_status(
         * IN_PROGRESS -> DONE (case completed)
     - Cases in DONE or REJECTED status cannot be edited (except comments)
     
+    BE-019: Category access validation:
+    - Executor must have access to the case category
+    - Returns 403 if executor has no access to category
+    
     Args:
         db: Database session
         case_id: Case UUID
@@ -1543,6 +1564,7 @@ def change_case_status(
         
     Raises:
         ValueError: If validation fails (case not found, not responsible, invalid transition, etc.)
+        ValueError: If executor has no access to case category (BE-019)
     """
     # Get case
     db_case = get_case(db, case_id)
@@ -1563,6 +1585,18 @@ def change_case_status(
     
     # BE-017: ADMIN can change status without responsible check
     is_admin = executor.role == models.UserRole.ADMIN
+    
+    # BE-019: Check category access for EXECUTOR role
+    if executor.role == models.UserRole.EXECUTOR:
+        has_access = has_executor_access_to_category(db, executor_id, db_case.category_id)
+        if not has_access:
+            logger.warning(
+                f"BE-019: Executor {executor_id} attempted to change status of case {case_id} "
+                f"without access to category {db_case.category_id}"
+            )
+            raise ValueError(
+                f"Access denied: You don't have access to category of this case"
+            )
     
     # Only responsible executor can change status (unless ADMIN)
     if not is_admin and db_case.responsible_id != executor_id:
@@ -2526,11 +2560,15 @@ def get_executor_cases(
     channel_ids: Optional[list[UUID]] = None
 ) -> tuple[list[models.Case], int]:
     """
-    Get cases for EXECUTOR role according to BE-016 rules.
+    Get cases for EXECUTOR role according to BE-016 and BE-019 rules.
     
-    Executor sees:
+    BE-016: Executor sees:
     1. All cases with status NEW (available to take)
     2. All cases where executor is assigned (responsible_id = executor_id)
+    
+    BE-019: Category access filtering:
+    - Executor only sees cases from categories they have access to
+    - If executor has no category access, returns empty list
     
     Args:
         db: Database session
@@ -2563,6 +2601,17 @@ def get_executor_cases(
     from datetime import datetime
     from sqlalchemy import or_, func, and_
     
+    # BE-019: Get allowed categories for executor
+    allowed_category_ids_query = select(models.ExecutorCategoryAccess.category_id).where(
+        models.ExecutorCategoryAccess.executor_id == executor_id
+    )
+    allowed_categories = db.execute(allowed_category_ids_query).scalars().all()
+    
+    # If executor has no category access, return empty list
+    if not allowed_categories:
+        logger.info(f"BE-019: Executor {executor_id} has no category access, returning empty list")
+        return [], 0
+    
     # Build base query with joins
     query = select(models.Case).options(
         joinedload(models.Case.category),
@@ -2577,6 +2626,9 @@ def get_executor_cases(
         models.Case.responsible_id == executor_id
     )
     query = query.where(executor_filter)
+    
+    # BE-019: Filter by allowed categories only
+    query = query.where(models.Case.category_id.in_(allowed_categories))
     
     # Apply additional filters (AND logic with executor_filter)
     # Single value filters (backward compatibility)
@@ -2663,6 +2715,9 @@ def get_executor_cases(
     
     # Count query with same filters
     count_query = select(func.count()).select_from(models.Case).where(executor_filter)
+    
+    # BE-019: Apply category access filter to count query
+    count_query = count_query.where(models.Case.category_id.in_(allowed_categories))
     
     # Re-apply all filters for counting
     if status:
