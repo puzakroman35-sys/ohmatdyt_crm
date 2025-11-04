@@ -1495,7 +1495,7 @@ def take_case(
     
     # BE-019: Check category access for EXECUTOR role
     if executor.role == models.UserRole.EXECUTOR:
-        has_access = has_executor_access_to_category(db, executor_id, db_case.category_id)
+        has_access = check_executor_has_category_access(db, executor_id, db_case.category_id)
         if not has_access:
             logger.warning(
                 f"BE-019: Executor {executor_id} attempted to take case {case_id} "
@@ -1588,7 +1588,7 @@ def change_case_status(
     
     # BE-019: Check category access for EXECUTOR role
     if executor.role == models.UserRole.EXECUTOR:
-        has_access = has_executor_access_to_category(db, executor_id, db_case.category_id)
+        has_access = check_executor_has_category_access(db, executor_id, db_case.category_id)
         if not has_access:
             logger.warning(
                 f"BE-019: Executor {executor_id} attempted to change status of case {case_id} "

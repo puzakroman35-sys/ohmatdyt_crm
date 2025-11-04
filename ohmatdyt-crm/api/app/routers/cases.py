@@ -650,7 +650,7 @@ async def get_case(
     
     # BE-019: Check category access for EXECUTOR
     if current_user.role == models.UserRole.EXECUTOR:
-        has_access = crud.has_executor_access_to_category(db, current_user.id, db_case.category_id)
+        has_access = crud.check_executor_has_category_access(db, current_user.id, db_case.category_id)
         if not has_access:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
