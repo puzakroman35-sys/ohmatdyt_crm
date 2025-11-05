@@ -1,0 +1,108 @@
+# =============================================================================
+# MANUAL DEPLOYMENT COMMANDS - Copy/paste one by one
+# Server: rpadmin@10.24.2.187
+# =============================================================================
+
+# STEP 1: Connect to server
+ssh rpadmin@10.24.2.187
+
+# STEP 2: Check if Docker is installed
+docker --version
+
+# If Docker is NOT installed, run this:
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+newgrp docker
+
+# STEP 3: Go to home directory
+cd ~
+
+# STEP 4: Clone repository (if exists, remove first)
+# Remove if exists:
+rm -rf ohmatdyt-crm
+
+# Clone fresh:
+git clone https://github.com/puzakroman35-sys/ohmatdyt_crm.git ohmatdyt-crm
+
+# STEP 5: Enter project directory
+cd ohmatdyt-crm/ohmatdyt-crm
+
+# STEP 6: Setup environment file
+cp .env.example .env.prod
+sed -i 's/192\.168\.31\.248/10.24.2.187/g' .env.prod
+sed -i 's/192\.168\.31\.249/10.24.2.187/g' .env.prod
+
+# STEP 7: Create Docker volumes
+docker volume create ohmatdyt_crm_db-data
+docker volume create ohmatdyt_crm_media
+docker volume create ohmatdyt_crm_static
+
+# STEP 8: Build Docker images (takes 10-15 minutes)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+
+# STEP 9: Start all services
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# STEP 10: Wait for services to start
+sleep 30
+
+# STEP 11: Run database migrations
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T api alembic upgrade head
+
+# STEP 12: Check status
+docker compose ps
+
+# STEP 13: View logs
+docker compose logs --tail=50
+
+# =============================================================================
+# POST-DEPLOYMENT
+# =============================================================================
+
+# IMPORTANT: Update passwords in .env.prod
+nano .env.prod
+# Change these:
+# - POSTGRES_PASSWORD=YourStrongPassword
+# - JWT_SECRET=YourRandomSecretKey
+
+# Restart after changing passwords
+docker compose restart
+
+# Create superuser
+docker compose exec api python -m app.scripts.create_superuser
+
+# =============================================================================
+# USEFUL COMMANDS
+# =============================================================================
+
+# View all logs in real-time
+docker compose logs -f
+
+# View specific service logs
+docker compose logs -f api
+docker compose logs -f frontend
+docker compose logs -f nginx
+
+# Check container status
+docker compose ps
+
+# Restart all services
+docker compose restart
+
+# Restart specific service
+docker compose restart api
+
+# Stop everything
+docker compose down
+
+# Start everything
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# =============================================================================
+# URLS
+# =============================================================================
+# Frontend:   http://10.24.2.187
+# API Docs:   http://10.24.2.187/api/docs
+# API Direct: http://10.24.2.187:8000
+# =============================================================================
