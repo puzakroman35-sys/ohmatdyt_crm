@@ -105,7 +105,7 @@ const CategoryAccessManager: React.FC<CategoryAccessManagerProps> = ({
   };
 
   // Обробка вибору елементів
-  const handleSelectChange: TransferProps['onSelectChange'] = (sourceSelectedKeys, targetSelectedKeys) => {
+  const handleSelectChange: TransferProps<any>['onSelectChange'] = (sourceSelectedKeys, targetSelectedKeys) => {
     const allKeys = [...sourceSelectedKeys, ...targetSelectedKeys].map(String);
     setSelectedKeys(allKeys);
   };
