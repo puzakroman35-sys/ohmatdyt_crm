@@ -85,8 +85,9 @@ app = FastAPI(
     title="Ohmatdyt CRM API",
     description="CRM system for Ohmatdyt hospital",
     version="0.1.0",
-    docs_url="/docs" if settings.APP_ENV == "development" else None,
-    redoc_url="/redoc" if settings.APP_ENV == "development" else None,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
     default_response_class=CustomJSONResponse,  # Use custom JSON encoder
 )
 
