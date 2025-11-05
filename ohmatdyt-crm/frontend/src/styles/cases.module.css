@@ -1,0 +1,27 @@
+/* Cases page row highlighting styles */
+
+/* Застарілі звернення (статус не змінювався >= 3 днів) */
+.ant-table-tbody > tr.stale-status-row > td {
+  background-color: #ffe4e1 !important;
+}
+
+.ant-table-tbody > tr.stale-status-row {
+  border-left: 3px solid #ffb3ba !important;
+}
+
+.ant-table-tbody > tr.stale-status-row:hover > td {
+  background-color: #ffd4d1 !important;
+}
+
+/* Прострочені звернення (створено > 7 днів тому) */
+.ant-table-tbody > tr.overdue-row > td {
+  background-color: #fff2f0 !important;
+}
+
+.ant-table-tbody > tr.overdue-row {
+  border-left: 3px solid #ff4d4f !important;
+}
+
+.ant-table-tbody > tr.overdue-row:hover > td {
+  background-color: #ffe7e6 !important;
+}

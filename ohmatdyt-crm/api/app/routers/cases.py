@@ -1208,46 +1208,58 @@ async def assign_case_executor(
 @router.patch("/{case_id}", response_model=schemas.CaseResponse)
 async def update_case_fields(
     case_id: UUID,
-    assignment: schemas.CaseAssignmentRequest,
+    case_update: schemas.CaseUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_admin)
 ):
     """
-    Assign or unassign executor to a case (ADMIN only).
+    Update case fields (ADMIN only).
     
-    BE-017: This endpoint allows ADMIN to manage case assignments:
-    - Assign executor: Sets responsible_id and changes status to IN_PROGRESS
-    - Unassign executor: Clears responsible_id and changes status back to NEW
+    BE-017: This endpoint allows ADMIN to edit all case fields including:
+    - category_id: Change case category
+    - channel_id: Change communication channel
+    - subcategory: Edit subcategory
+    - applicant_name: Edit applicant name
+    - applicant_phone: Edit phone number
+    - applicant_email: Edit email address
+    - summary: Edit case description
     
     Business rules:
     - Only ADMIN role has access
-    - Assigned user must be EXECUTOR or ADMIN
-    - Assigned user must be active
-    - When assigning: status -> IN_PROGRESS (if not already)
-    - When unassigning (null): status -> NEW
-    - Assignment changes are logged in case history
+    - Category and channel must exist and be active
+    - All field validations from CaseUpdate schema apply
     
-    Request body:
-    - assigned_to_id: UUID of executor to assign, or null to unassign
+    Request body (all fields optional):
+    - category_id: UUID of category
+    - channel_id: UUID of channel
+    - subcategory: Subcategory text (max 200 chars)
+    - applicant_name: Applicant name (1-200 chars)
+    - applicant_phone: Phone number (min 9 digits)
+    - applicant_email: Valid email address
+    - summary: Case description (min 1 char)
     
     RBAC:
-    - ADMIN: Full access to assign/unassign any case
+    - ADMIN: Full access to edit any case
     - EXECUTOR/OPERATOR: 403 Forbidden
     
     Returns:
-    - Updated case with new assignment and status
+    - Updated case with modified fields
     
     Errors:
-    - 400: Validation error (invalid user, not an executor, inactive user)
+    - 400: Validation error (invalid category/channel, invalid data format)
     - 403: User is not ADMIN
     - 404: Case not found
     """
     try:
-        db_case = crud.assign_case_executor(
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"PATCH /api/cases/{case_id} - Received update data: {case_update.model_dump(exclude_unset=True)}")
+        
+        db_case = crud.update_case(
             db=db,
             case_id=case_id,
-            executor_id=assignment.assigned_to_id,
-            admin_id=current_user.id
+            case_update=case_update
         )
         
         if not db_case:
@@ -1255,6 +1267,9 @@ async def update_case_fields(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Case with id '{case_id}' not found"
             )
+        
+        # Debug logging
+        logger.info(f"PATCH /api/cases/{case_id} - Updated case data: name={db_case.applicant_name}, phone={db_case.applicant_phone}, email={db_case.applicant_email}")
         
         return schemas.CaseResponse(
             id=str(db_case.id),

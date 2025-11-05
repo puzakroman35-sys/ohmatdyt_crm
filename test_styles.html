@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Case Row Styles</title>
+    <style>
+        .stale-status-row td {
+            background-color: #ffe4e1 !important;
+        }
+        .stale-status-row {
+            border-left: 3px solid #ffb3ba !important;
+        }
+        .stale-status-row:hover td {
+            background-color: #ffd4d1 !important;
+        }
+        .overdue-row td {
+            background-color: #fff2f0 !important;
+        }
+        .overdue-row {
+            border-left: 3px solid #ff4d4f !important;
+        }
+        .overdue-row:hover td {
+            background-color: #ffe7e6 !important;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Тест стилів підсвічування звернень</h1>
+    
+    <h2>Звернення зі застарілим статусом (3+ днів)</h2>
+    <table>
+        <tr class="stale-status-row">
+            <td>#123456</td>
+            <td>2025-11-01</td>
+            <td>Іван Петров</td>
+            <td>IN_PROGRESS</td>
+        </tr>
+    </table>
+    
+    <h2>Прострочене звернення (7+ днів)</h2>
+    <table>
+        <tr class="overdue-row">
+            <td>#654321</td>
+            <td>2025-10-25</td>
+            <td>Марія Коваль</td>
+            <td>NEW</td>
+        </tr>
+    </table>
+    
+    <h2>Звичайне звернення</h2>
+    <table>
+        <tr>
+            <td>#789012</td>
+            <td>2025-11-04</td>
+            <td>Олександр Сидоренко</td>
+            <td>NEW</td>
+        </tr>
+    </table>
+    
+    <script>
+        console.log('✅ Якщо ви бачите:');
+        console.log('1. Блідо-червоний фон для "застарілого" звернення');
+        console.log('2. Темно-червоний фон для "прострочен��го" звернення');
+        console.log('3. Білий фон для звичайного звернення');
+        console.log('То стилі працюють правильно!');
+    </script>
+</body>
+</html>

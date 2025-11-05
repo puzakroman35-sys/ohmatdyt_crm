@@ -261,6 +261,23 @@ class CaseUpdate(BaseModel):
     status: Optional[CaseStatus] = None
     responsible_id: Optional[str] = None
     
+    @field_validator('subcategory', 'applicant_email', mode='before')
+    @classmethod
+    def empty_string_to_none(cls, v: Optional[str]) -> Optional[str]:
+        """Convert empty strings to None for optional fields"""
+        if v is not None and isinstance(v, str) and not v.strip():
+            return None
+        return v
+    
+    @field_validator('applicant_name', 'summary', mode='before')
+    @classmethod
+    def strip_required_fields(cls, v: Optional[str]) -> Optional[str]:
+        """Strip whitespace from required fields"""
+        if v is not None and isinstance(v, str):
+            stripped = v.strip()
+            return stripped if stripped else None
+        return v
+    
     @field_validator('applicant_phone')
     @classmethod
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:

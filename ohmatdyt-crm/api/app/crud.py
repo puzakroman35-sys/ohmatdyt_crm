@@ -1097,10 +1097,15 @@ def update_case(
         ValueError: If category, channel, or responsible user doesn't exist or is invalid
     """
     from uuid import UUID as parse_uuid
+    import logging
+    logger = logging.getLogger(__name__)
     
     db_case = get_case(db, case_id)
     if not db_case:
         return None
+    
+    logger.info(f"update_case: Before update - name={db_case.applicant_name}, phone={db_case.applicant_phone}, email={db_case.applicant_email}")
+    logger.info(f"update_case: Update data - {case_update.model_dump(exclude_unset=True)}")
     
     # Update fields if provided
     if case_update.category_id is not None:
@@ -1155,8 +1160,12 @@ def update_case(
                 raise ValueError(f"User '{responsible.username}' is not active")
             db_case.responsible_id = parse_uuid(case_update.responsible_id)
     
+    logger.info(f"update_case: After update - name={db_case.applicant_name}, phone={db_case.applicant_phone}, email={db_case.applicant_email}")
+    
     db.commit()
     db.refresh(db_case)
+    
+    logger.info(f"update_case: After commit - name={db_case.applicant_name}, phone={db_case.applicant_phone}, email={db_case.applicant_email}")
     
     return db_case
 

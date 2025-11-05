@@ -56,13 +56,14 @@ const EditCaseFieldsForm: React.FC<EditCaseFieldsFormProps> = ({
 
   const showModal = () => {
     // Заповнюємо форму поточними значеннями
+    // Для необов'язкових полів використовуємо undefined замість порожніх рядків
     form.setFieldsValue({
       category_id: caseDetail.category.id,
       channel_id: caseDetail.channel.id,
-      subcategory: caseDetail.subcategory || '',
+      subcategory: caseDetail.subcategory || undefined,
       applicant_name: caseDetail.applicant_name,
-      applicant_phone: caseDetail.applicant_phone || '',
-      applicant_email: caseDetail.applicant_email || '',
+      applicant_phone: caseDetail.applicant_phone || undefined,
+      applicant_email: caseDetail.applicant_email || undefined,
       summary: caseDetail.summary,
     });
     setIsModalVisible(true);
@@ -76,28 +77,57 @@ const EditCaseFieldsForm: React.FC<EditCaseFieldsFormProps> = ({
   const handleSubmit = async (values: CaseUpdateRequest) => {
     setLoading(true);
     try {
-      // Видаляємо порожні поля
+      // Нормалізуємо значення (порожні рядки -> undefined для необов'язкових полів)
+      const normalizeValue = (value: any) => {
+        if (value === '' || value === null) return undefined;
+        return value;
+      };
+
+      const normalizedValues = {
+        category_id: values.category_id,
+        channel_id: values.channel_id,
+        subcategory: normalizeValue(values.subcategory),
+        applicant_name: values.applicant_name,
+        applicant_phone: normalizeValue(values.applicant_phone),
+        applicant_email: normalizeValue(values.applicant_email),
+        summary: values.summary,
+      };
+
+      // Відправляємо тільки змінені поля
       const updateData: CaseUpdateRequest = {};
-      if (values.category_id && values.category_id !== caseDetail.category.id) {
-        updateData.category_id = values.category_id;
+      
+      if (normalizedValues.category_id && normalizedValues.category_id !== caseDetail.category.id) {
+        updateData.category_id = normalizedValues.category_id;
       }
-      if (values.channel_id && values.channel_id !== caseDetail.channel.id) {
-        updateData.channel_id = values.channel_id;
+      
+      if (normalizedValues.channel_id && normalizedValues.channel_id !== caseDetail.channel.id) {
+        updateData.channel_id = normalizedValues.channel_id;
       }
-      if (values.subcategory !== caseDetail.subcategory) {
-        updateData.subcategory = values.subcategory || undefined;
+      
+      // Для subcategory порівнюємо нормалізовані значення
+      const currentSubcategory = normalizeValue(caseDetail.subcategory);
+      if (normalizedValues.subcategory !== currentSubcategory) {
+        updateData.subcategory = normalizedValues.subcategory;
       }
-      if (values.applicant_name && values.applicant_name !== caseDetail.applicant_name) {
-        updateData.applicant_name = values.applicant_name;
+      
+      if (normalizedValues.applicant_name && normalizedValues.applicant_name !== caseDetail.applicant_name) {
+        updateData.applicant_name = normalizedValues.applicant_name;
       }
-      if (values.applicant_phone !== caseDetail.applicant_phone) {
-        updateData.applicant_phone = values.applicant_phone || undefined;
+      
+      // Для phone порівнюємо нормалізовані значення
+      const currentPhone = normalizeValue(caseDetail.applicant_phone);
+      if (normalizedValues.applicant_phone !== currentPhone) {
+        updateData.applicant_phone = normalizedValues.applicant_phone;
       }
-      if (values.applicant_email !== caseDetail.applicant_email) {
-        updateData.applicant_email = values.applicant_email || undefined;
+      
+      // Для email порівнюємо нормалізовані значення
+      const currentEmail = normalizeValue(caseDetail.applicant_email);
+      if (normalizedValues.applicant_email !== currentEmail) {
+        updateData.applicant_email = normalizedValues.applicant_email;
       }
-      if (values.summary && values.summary !== caseDetail.summary) {
-        updateData.summary = values.summary;
+      
+      if (normalizedValues.summary && normalizedValues.summary !== caseDetail.summary) {
+        updateData.summary = normalizedValues.summary;
       }
 
       // Якщо немає змін
@@ -107,6 +137,7 @@ const EditCaseFieldsForm: React.FC<EditCaseFieldsFormProps> = ({
         return;
       }
 
+      console.log('Відправляємо оновлені дані:', updateData);
       await api.patch(`/api/cases/${caseDetail.id}`, updateData);
 
       message.success('Поля звернення успішно оновлено');
