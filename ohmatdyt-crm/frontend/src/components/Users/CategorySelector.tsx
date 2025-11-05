@@ -61,13 +61,13 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
   };
 
   // Обробка зміни вибраних категорій
-  const handleChange: TransferProps['onChange'] = (newTargetKeys) => {
+  const handleChange: TransferProps<any>['onChange'] = (newTargetKeys) => {
     const keys = newTargetKeys.map(String);
     onChange(keys);
   };
 
   // Обробка вибору елементів
-  const handleSelectChange: TransferProps['onSelectChange'] = (sourceSelectedKeys, targetSelectedKeys) => {
+  const handleSelectChange: TransferProps<any>['onSelectChange'] = (sourceSelectedKeys, targetSelectedKeys) => {
     const allKeys = [...sourceSelectedKeys, ...targetSelectedKeys].map(String);
     setSelectedKeys(allKeys);
   };
