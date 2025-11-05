@@ -92,7 +92,7 @@ const CategoryAccessManager: React.FC<CategoryAccessManagerProps> = ({
   };
 
   // Обробка зміни вибраних категорій
-  const handleChange: TransferProps['onChange'] = (newTargetKeys) => {
+  const handleChange: TransferProps<any>['onChange'] = (newTargetKeys) => {
     const keys = newTargetKeys.map(String);
     setTargetKeys(keys);
     
