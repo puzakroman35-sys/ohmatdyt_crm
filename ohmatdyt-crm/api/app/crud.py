@@ -566,7 +566,8 @@ def get_channels(
     db: Session,
     skip: int = 0,
     limit: int = 100,
-    include_inactive: bool = False
+    include_inactive: bool = False,
+    search: str = None
 ) -> list[models.Channel]:
     """
     Get list of channels with optional filtering.
@@ -576,6 +577,7 @@ def get_channels(
         skip: Number of records to skip
         limit: Maximum number of records to return
         include_inactive: Include inactive channels
+        search: Search term to filter by channel name (case-insensitive)
         
     Returns:
         List of channel models
@@ -584,6 +586,10 @@ def get_channels(
     
     if not include_inactive:
         query = query.where(models.Channel.is_active == True)
+    
+    # Фільтрація за пошуковим запитом
+    if search:
+        query = query.where(models.Channel.name.ilike(f"%{search}%"))
     
     query = query.offset(skip).limit(limit).order_by(models.Channel.name)
     
