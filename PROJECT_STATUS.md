@@ -1,7 +1,408 @@
 ﻿# Ohmatdyt CRM - Project Status
 
-**Last Updated:** November 4, 2025
-**Latest Completed:** FE-013 - Фільтрація звернень для виконавців по категоріях (UI) - COMPLETED ✅
+**Last Updated:** November 6, 2025
+**Latest Completed:** BE-020 - Профіль користувача: зміна власного пароля - COMPLETED ✅
+
+## 🔐 Backend Phase 1: User Profile - Password Change (November 6, 2025 - BE-020)
+
+### BE-020: Профіль користувача - зміна власного пароля ✅
+
+**Мета:** Надати можливість будь-якому авторизованому користувачу змінити свій власний пароль.
+
+**Залежності:** BE-002 (аутентифікація), BE-001 (модель User)
+
+#### 1. Pydantic Schemas - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/api/app/schemas.py` (оновлено)
+
+**Додано схеми для зміни пароля:**
+
+```python
+# ==================== Password Change Schemas (BE-020) ====================
+
+class ChangePasswordRequest(BaseModel):
+    """Schema for password change request"""
+    current_password: str = Field(..., min_length=1, description="Current password for verification")
+    new_password: str = Field(..., min_length=8, description="New password")
+    confirm_password: str = Field(..., min_length=8, description="Confirm new password")
+    
+    @field_validator('new_password')
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        """Validate new password strength"""
+        from app.auth import validate_password_strength
+        is_valid, error_msg = validate_password_strength(v)
+        if not is_valid:
+            raise ValueError(error_msg)
+        return v
+    
+    @model_validator(mode='after')
+    def validate_passwords_match(self):
+        """Validate that new password and confirm password match"""
+        if self.new_password != self.confirm_password:
+            raise ValueError("New password and confirm password do not match")
+        return self
+
+
+class ChangePasswordResponse(BaseModel):
+    """Schema for password change response"""
+    message: str
+    changed_at: datetime
+```
+
+**Валідації:**
+- ✅ current_password - обов'язкове поле
+- ✅ new_password - мінімум 8 символів
+- ✅ confirm_password - мінімум 8 символів
+- ✅ Перевірка сили пароля (велика/маленька літера, цифра)
+- ✅ Перевірка що new_password == confirm_password
+
+#### 2. Enhanced Password Validation - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/api/app/auth.py` (оновлено)
+
+**Покращено функцію validate_password_strength:**
+
+```python
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """
+    Validate password strength according to requirements (BE-020):
+    - Minimum 8 characters
+    - Must contain at least one uppercase letter
+    - Must contain at least one lowercase letter
+    - Must contain at least one digit
+    
+    Args:
+        password: Password to validate
+        
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+    
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter"
+    
+    if not re.search(r"[a-z]", password):
+        return False, "Password must contain at least one lowercase letter"
+    
+    if not re.search(r"\d", password):
+        return False, "Password must contain at least one digit"
+    
+    return True, ""
+```
+
+**Покращення:**
+- ✅ Додано перевірку великої літери (A-Z)
+- ✅ Додано перевірку маленької літери (a-z)
+- ✅ Збережено перевірку цифри (0-9)
+- ✅ Детальні повідомлення про помилки
+
+#### 3. CRUD Functions - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/api/app/crud.py` (оновлено)
+
+**Додано функції для зміни пароля:**
+
+```python
+def verify_user_password(db: Session, user: models.User, password: str) -> bool:
+    """
+    Verify user's password (BE-020).
+    
+    Args:
+        db: Database session
+        user: User model
+        password: Plain text password to verify
+        
+    Returns:
+        True if password is correct, False otherwise
+    """
+    from app.auth import verify_password
+    return verify_password(password, user.password_hash)
+
+
+def change_user_password(db: Session, user: models.User, new_password: str) -> models.User:
+    """
+    Change user's password (BE-020).
+    
+    Args:
+        db: Database session
+        user: User model
+        new_password: New plain text password
+        
+    Returns:
+        Updated user model
+    """
+    from datetime import datetime
+    
+    # Hash new password
+    user.password_hash = hash_password(new_password)
+    user.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(user)
+    
+    logger.info(f"Password changed for user {user.username} (ID: {user.id})")
+    
+    return user
+```
+
+**Функції:**
+- ✅ `verify_user_password()` - перевірка поточного пароля
+- ✅ `change_user_password()` - зміна пароля з хешуванням
+- ✅ Оновлення updated_at timestamp
+- ✅ Логування зміни пароля
+
+#### 4. Change Password Endpoint - COMPLETED ✅
+
+**Файл:** `ohmatdyt-crm/api/app/routers/auth.py` (оновлено)
+
+**Додано endpoint для зміни пароля:**
+
+```python
+@router.post("/change-password", response_model=schemas.ChangePasswordResponse)
+async def change_password(
+    password_data: schemas.ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change current user's password (BE-020).
+    
+    **Headers:**
+    - Authorization: Bearer {access_token}
+    
+    **Request:**
+    - current_password: Current password for verification
+    - new_password: New password (min 8 chars, uppercase, lowercase, digit)
+    - confirm_password: Confirm new password (must match new_password)
+    
+    **Response:**
+    - message: Success message
+    - changed_at: Timestamp of password change
+    
+    **Errors:**
+    - 401: Current password is incorrect or user not authenticated
+    - 400: Validation errors (passwords don't match, weak password)
+    - 422: New password is the same as current password
+    """
+    # Verify current password
+    if not crud.verify_user_password(db, current_user, password_data.current_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect"
+        )
+    
+    # Check if new password is different from current
+    if crud.verify_user_password(db, current_user, password_data.new_password):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password cannot be the same as current password"
+        )
+    
+    # Change password
+    from datetime import datetime
+    changed_at = datetime.utcnow()
+    crud.change_user_password(db, current_user, password_data.new_password)
+    
+    return schemas.ChangePasswordResponse(
+        message="Password changed successfully",
+        changed_at=changed_at
+    )
+```
+
+**Endpoint:** `POST /auth/change-password`
+
+**Features:**
+- ✅ Доступний для всіх авторизованих користувачів
+- ✅ Перевірка поточного пароля
+- ✅ Валідація нового пароля
+- ✅ Перевірка що новий пароль != поточний
+- ✅ Хешування та збереження нового пароля
+- ✅ Response з timestamp зміни
+
+#### 5. Comprehensive Test Suite - COMPLETED ✅
+
+**Файл:** `test_be020.py` (480 рядків)
+
+**Створено комплексні тести для всіх сценаріїв:**
+
+**Тест 1: Успішна зміна пароля**
+```python
+def test_change_password_success():
+    """Тест 1: Успішна зміна пароля"""
+    # 1. Логін з оригінальним паролем
+    # 2. Зміна пароля на новий
+    # 3. Перевірка що старий пароль не працює
+    # 4. Перевірка що новий пароль працює
+    # 5. Повернення оригінального пароля
+```
+
+**Тест 2: Невірний поточний пароль**
+```python
+def test_wrong_current_password():
+    """Тест 2: Помилка при невірному поточному паролі"""
+    # Очікується: 401 Unauthorized
+```
+
+**Тест 3: Паролі не співпадають**
+```python
+def test_passwords_dont_match():
+    """Тест 3: Помилка якщо new_password != confirm_password"""
+    # Очікується: 422 Unprocessable Entity
+```
+
+**Тест 4: Пароль надто короткий**
+```python
+def test_password_too_short():
+    """Тест 4: Помилка якщо пароль надто короткий (<8 символів)"""
+    # Очікується: 422 Unprocessable Entity
+```
+
+**Тест 5: Пароль без великої літери**
+```python
+def test_password_no_uppercase():
+    """Тест 5: Помилка якщо пароль без великої літери"""
+    # Очікується: 422 Unprocessable Entity
+```
+
+**Тест 6: Пароль без цифри**
+```python
+def test_password_no_digit():
+    """Тест 6: Помилка якщо пароль без цифри"""
+    # Очікується: 422 Unprocessable Entity
+```
+
+**Тест 7: Новий пароль == поточний**
+```python
+def test_new_password_same_as_current():
+    """Тест 7: Помилка якщо новий пароль співпадає з поточним"""
+    # Очікується: 422 Unprocessable Entity
+```
+
+**Тест 8: Неавторизований запит**
+```python
+def test_unauthorized_request():
+    """Тест 8: Помилка якщо запит без токену"""
+    # Очікується: 401 Unauthorized
+```
+
+**Тест 9: OPERATOR може змінити пароль**
+```python
+def test_operator_can_change_password():
+    """Тест 9: OPERATOR може змінити свій пароль"""
+    # Перевірка що не-адміни теж можуть міняти пароль
+```
+
+**Test Results:**
+```
+================================================================================
+ПІДСУМОК ТЕСТУВАННЯ BE-020
+================================================================================
+Результати тестування:
+  ✅ PASS - login_with_original_password
+  ✅ PASS - change_password_success
+  ✅ PASS - login_with_old_password_fails
+  ✅ PASS - login_with_new_password
+  ✅ PASS - restore_original_password
+  ✅ PASS - wrong_current_password_401
+  ✅ PASS - passwords_mismatch_422
+  ✅ PASS - password_too_short_422
+  ✅ PASS - password_no_uppercase_422
+  ✅ PASS - password_no_digit_422
+  ✅ PASS - same_password_422
+  ✅ PASS - unauthorized_401
+  ✅ PASS - operator_change_password
+
+📊 TOTAL - 13/13 тестів пройдено
+
+✅ Всі тести пройдено успішно! ✨
+ℹ️  BE-020 ГОТОВО ДО PRODUCTION ✅
+```
+
+#### 6. BE-020 Summary - PRODUCTION READY ✅
+
+**Що імплементовано:**
+
+**Schemas:**
+- ✅ `ChangePasswordRequest` - валідація запиту зміни пароля
+- ✅ `ChangePasswordResponse` - відповідь з timestamp
+- ✅ Валідація сили пароля через Pydantic validators
+- ✅ Перевірка що паролі співпадають
+
+**Password Validation:**
+- ✅ Мінімум 8 символів
+- ✅ Велика літера (A-Z)
+- ✅ Маленька літера (a-z)
+- ✅ Цифра (0-9)
+- ✅ Детальні повідомлення про помилки
+
+**CRUD Functions:**
+- ✅ `verify_user_password()` - перевірка пароля користувача
+- ✅ `change_user_password()` - зміна пароля з хешуванням
+- ✅ Оновлення updated_at timestamp
+- ✅ Логування змін
+
+**API Endpoint:**
+- ✅ `POST /auth/change-password` - зміна власного пароля
+- ✅ Доступний для всіх авторизованих користувачів
+- ✅ Перевірка поточного пароля (401 якщо невірний)
+- ✅ Валідація нового пароля (422 якщо невалідний)
+- ✅ Перевірка що новий != поточний (422 якщо однакові)
+- ✅ Success response з message та timestamp
+
+**Files Created:**
+- ✅ `test_be020.py` (480 lines) - комплексні тести
+
+**Files Modified:**
+- ✅ `api/app/schemas.py` - додано ChangePasswordRequest/Response
+- ✅ `api/app/auth.py` - покращено validate_password_strength
+- ✅ `api/app/crud.py` - додано verify_user_password, change_user_password
+- ✅ `api/app/routers/auth.py` - додано POST /auth/change-password
+
+**DoD Verification:**
+- ✅ Endpoint POST /auth/change-password реалізовано
+- ✅ Перевірка поточного пароля працює
+- ✅ Валідація нового пароля працює (8+, велика/маленька, цифра)
+- ✅ Перевірка що новий != поточний працює
+- ✅ Новий пароль хешується та зберігається
+- ✅ Користувач може увійти з новим паролем
+- ✅ Помилка 401 при невірному поточному паролі
+- ✅ Помилка 422 при невалідному новому паролі
+- ✅ Endpoint задокументовано в OpenAPI
+- ✅ Написано та пройдено 13 тестів
+
+**Testing Coverage:**
+- ✅ Успішна зміна пароля (5 перевірок)
+- ✅ Невірний поточний пароль (401)
+- ✅ Паролі не співпадають (422)
+- ✅ Пароль надто короткий (422)
+- ✅ Пароль без великої літери (422)
+- ✅ Пароль без цифри (422)
+- ✅ Новий пароль == поточний (422)
+- ✅ Неавторизований запит (401)
+- ✅ Тестування для різних ролей
+
+**Security Features:**
+- ✅ Обов'язкова перевірка поточного пароля
+- ✅ Строга валідація нового пароля
+- ✅ Заборона повторного використання поточного пароля
+- ✅ Bcrypt хешування паролів
+- ✅ Логування змін пароля
+- ✅ Аутентифікація через JWT token
+
+**Production Ready Features:**
+- Самообслуговування користувачів (не потрібен адмін)
+- Безпечна зміна пароля з валідацією
+- Детальні повідомлення про помилки
+- Логування для аудиту
+- Комплексне тестування
+- OpenAPI документація
+
+**Status:** ✅ BE-020 PRODUCTION READY (100%)
+
+---
 
 ## 🏗️ Infrastructure Phase 1: Production Nginx with HTTPS (October 30, 2025 - INF-003)
 

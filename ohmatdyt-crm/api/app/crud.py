@@ -106,6 +106,48 @@ def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
     ).scalar_one_or_none()
 
 
+def verify_user_password(db: Session, user: models.User, password: str) -> bool:
+    """
+    Verify user's password (BE-020).
+    
+    Args:
+        db: Database session
+        user: User model
+        password: Plain text password to verify
+        
+    Returns:
+        True if password is correct, False otherwise
+    """
+    from app.auth import verify_password
+    return verify_password(password, user.password_hash)
+
+
+def change_user_password(db: Session, user: models.User, new_password: str) -> models.User:
+    """
+    Change user's password (BE-020).
+    
+    Args:
+        db: Database session
+        user: User model
+        new_password: New plain text password
+        
+    Returns:
+        Updated user model
+    """
+    from datetime import datetime
+    
+    # Hash new password
+    user.password_hash = hash_password(new_password)
+    user.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(user)
+    
+    logger.info(f"Password changed for user {user.username} (ID: {user.id})")
+    
+    return user
+
+
 def get_users(
     db: Session,
     skip: int = 0,

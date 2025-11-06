@@ -222,3 +222,55 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
         created_at=current_user.created_at,
         updated_at=current_user.updated_at
     )
+
+
+@router.post("/change-password", response_model=schemas.ChangePasswordResponse)
+async def change_password(
+    password_data: schemas.ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change current user's password (BE-020).
+    
+    **Headers:**
+    - Authorization: Bearer {access_token}
+    
+    **Request:**
+    - current_password: Current password for verification
+    - new_password: New password (min 8 chars, uppercase, lowercase, digit)
+    - confirm_password: Confirm new password (must match new_password)
+    
+    **Response:**
+    - message: Success message
+    - changed_at: Timestamp of password change
+    
+    **Errors:**
+    - 401: Current password is incorrect or user not authenticated
+    - 400: Validation errors (passwords don't match, weak password)
+    - 422: New password is the same as current password
+    """
+    # Verify current password
+    if not crud.verify_user_password(db, current_user, password_data.current_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect"
+        )
+    
+    # Check if new password is different from current
+    if crud.verify_user_password(db, current_user, password_data.new_password):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password cannot be the same as current password"
+        )
+    
+    # Change password
+    from datetime import datetime
+    changed_at = datetime.utcnow()
+    crud.change_user_password(db, current_user, password_data.new_password)
+    
+    return schemas.ChangePasswordResponse(
+        message="Password changed successfully",
+        changed_at=changed_at
+    )
+
