@@ -90,6 +90,9 @@ const UsersPage: React.FC = () => {
     search: '',
   });
 
+  // Локальний стан для пошуку (з debounce)
+  const [searchInput, setSearchInput] = useState('');
+
   // Стан пагінації
   const [pagination, setPagination] = useState({
     current: 1,
@@ -137,7 +140,20 @@ const UsersPage: React.FC = () => {
     if (hasAccess) {
       loadUsers();
     }
-  }, [hasAccess, pagination.current, pagination.pageSize, sorter, filters]);
+  }, [hasAccess, pagination.current, pagination.pageSize, sorter, filters.role, filters.is_active, filters.search]);
+
+  // Debounce для пошуку
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters((prev) => ({ ...prev, search: searchInput }));
+      // Скидаємо пагінацію при зміні пошуку
+      if (searchInput !== filters.search) {
+        setPagination((prev) => ({ ...prev, current: 1 }));
+      }
+    }, 500); // Затримка 500мс
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   // Обробка помилок
   useEffect(() => {
@@ -340,11 +356,10 @@ const UsersPage: React.FC = () => {
                 <Input
                   placeholder="Пошук за ПІБ, логіном або email..."
                   prefix={<SearchOutlined />}
-                  value={filters.search}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, search: e.target.value }))
-                  }
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   allowClear
+                  onClear={() => setSearchInput('')}
                 />
               </Col>
               <Col xs={24} sm={12} md={4}>
@@ -352,9 +367,10 @@ const UsersPage: React.FC = () => {
                   placeholder="Роль"
                   style={{ width: '100%' }}
                   value={filters.role}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, role: value }))
-                  }
+                  onChange={(value) => {
+                    setFilters((prev) => ({ ...prev, role: value }));
+                    setPagination((prev) => ({ ...prev, current: 1 }));
+                  }}
                   allowClear
                 >
                   {Object.entries(roleLabels).map(([key, label]) => (
@@ -369,9 +385,10 @@ const UsersPage: React.FC = () => {
                   placeholder="Статус"
                   style={{ width: '100%' }}
                   value={filters.is_active}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, is_active: value }))
-                  }
+                  onChange={(value) => {
+                    setFilters((prev) => ({ ...prev, is_active: value }));
+                    setPagination((prev) => ({ ...prev, current: 1 }));
+                  }}
                   allowClear
                 >
                   <Option value={true}>Активний</Option>
@@ -382,12 +399,13 @@ const UsersPage: React.FC = () => {
                 <Button
                   icon={<ReloadOutlined />}
                   onClick={() => {
+                    setSearchInput('');
                     setFilters({
                       role: undefined,
                       is_active: undefined,
                       search: '',
                     });
-                    loadUsers();
+                    setPagination((prev) => ({ ...prev, current: 1 }));
                   }}
                   block
                 >

@@ -809,6 +809,7 @@ def get_all_cases(
     order_by: Optional[str] = "-created_at",
     skip: int = 0,
     limit: int = 50,
+    search: Optional[str] = None,  # Combined search by applicant name, phone, email or public_id
     # BE-201: Extended filters
     subcategory: Optional[str] = None,
     applicant_name: Optional[str] = None,
@@ -837,6 +838,7 @@ def get_all_cases(
         order_by: Sort field (prefix with - for descending, e.g., -created_at)
         skip: Number of records to skip (pagination)
         limit: Maximum number of records to return
+        search: Combined search by applicant name, phone, email or public_id (OR logic)
         
         # BE-201: Extended filters (all use AND logic)
         subcategory: Filter by subcategory (exact match or LIKE if contains %)
@@ -874,6 +876,41 @@ def get_all_cases(
         query = query.where(models.Case.responsible_id == responsible_id)
     if public_id:
         query = query.where(models.Case.public_id == public_id)
+    
+    # Combined search filter (OR logic within search)
+    if search:
+        from sqlalchemy import or_, and_
+        search_filters = []
+        
+        # Search in applicant name, phone, email (case-insensitive) - only if fields are not NULL
+        search_filters.append(
+            and_(
+                models.Case.applicant_name.isnot(None),
+                models.Case.applicant_name.ilike(f"%{search}%")
+            )
+        )
+        search_filters.append(
+            and_(
+                models.Case.applicant_phone.isnot(None),
+                models.Case.applicant_phone.like(f"%{search}%")
+            )
+        )
+        search_filters.append(
+            and_(
+                models.Case.applicant_email.isnot(None),
+                models.Case.applicant_email.ilike(f"%{search}%")
+            )
+        )
+        
+        # Search by public_id if search is a number
+        if search.isdigit():
+            try:
+                public_id_search = int(search)
+                search_filters.append(models.Case.public_id == public_id_search)
+            except ValueError:
+                pass
+        
+        query = query.where(or_(*search_filters))
     
     # BE-201: Multiple value filters (OR within the list, AND with other filters)
     if statuses and len(statuses) > 0:
@@ -2557,6 +2594,7 @@ def get_executor_cases(
     order_by: Optional[str] = "-created_at",
     skip: int = 0,
     limit: int = 50,
+    search: Optional[str] = None,  # Combined search by applicant name, phone, email or public_id
     # BE-201: Extended filters
     subcategory: Optional[str] = None,
     applicant_name: Optional[str] = None,
@@ -2649,6 +2687,41 @@ def get_executor_cases(
         query = query.where(models.Case.channel_id == channel_id)
     if public_id:
         query = query.where(models.Case.public_id == public_id)
+    
+    # Combined search filter (OR logic within search)
+    if search:
+        from sqlalchemy import or_, and_
+        search_filters = []
+        
+        # Search in applicant name, phone, email (case-insensitive) - only if fields are not NULL
+        search_filters.append(
+            and_(
+                models.Case.applicant_name.isnot(None),
+                models.Case.applicant_name.ilike(f"%{search}%")
+            )
+        )
+        search_filters.append(
+            and_(
+                models.Case.applicant_phone.isnot(None),
+                models.Case.applicant_phone.like(f"%{search}%")
+            )
+        )
+        search_filters.append(
+            and_(
+                models.Case.applicant_email.isnot(None),
+                models.Case.applicant_email.ilike(f"%{search}%")
+            )
+        )
+        
+        # Search by public_id if search is a number
+        if search.isdigit():
+            try:
+                public_id_search = int(search)
+                search_filters.append(models.Case.public_id == public_id_search)
+            except ValueError:
+                pass
+        
+        query = query.where(or_(*search_filters))
     
     # BE-201: Multiple value filters (OR within the list, AND with other filters)
     if statuses and len(statuses) > 0:

@@ -297,6 +297,7 @@ async def list_my_cases(
     date_to: Optional[str] = None,
     overdue: Optional[bool] = None,
     order_by: Optional[str] = "-created_at",
+    search: Optional[str] = None,  # Search by applicant name, phone, email or public_id
     # BE-201: Extended filters
     subcategory: Optional[str] = None,
     applicant_name: Optional[str] = None,
@@ -395,6 +396,7 @@ async def list_my_cases(
         order_by=order_by,
         skip=skip,
         limit=limit,
+        search=search,
         # BE-201: Extended filters
         subcategory=subcategory,
         applicant_name=applicant_name,
@@ -430,6 +432,7 @@ async def list_assigned_cases(
     date_to: Optional[str] = None,
     overdue: Optional[bool] = None,
     order_by: Optional[str] = "-created_at",
+    search: Optional[str] = None,  # Search by applicant name, phone, email or public_id
     # BE-201: Extended filters
     subcategory: Optional[str] = None,
     applicant_name: Optional[str] = None,
@@ -533,6 +536,7 @@ async def list_assigned_cases(
             order_by=order_by,
             skip=skip,
             limit=limit,
+            search=search,
             # BE-201: Extended filters
             subcategory=subcategory,
             applicant_name=applicant_name,
@@ -560,6 +564,7 @@ async def list_assigned_cases(
             order_by=order_by,
             skip=skip,
             limit=limit,
+            search=search,
             # BE-201: Extended filters
             subcategory=subcategory,
             applicant_name=applicant_name,
@@ -804,6 +809,7 @@ async def list_cases(
     date_to: Optional[str] = None,
     overdue: Optional[bool] = None,
     order_by: Optional[str] = "-created_at",
+    search: Optional[str] = None,  # Search by applicant name, phone, email or public_id
     # BE-201: Extended filters
     subcategory: Optional[str] = None,
     applicant_name: Optional[str] = None,
@@ -839,6 +845,7 @@ async def list_cases(
     - order_by: Sort field (prefix with - for descending)
                 Supported: created_at, updated_at, public_id, status
                 Examples: -created_at (newest first), created_at (oldest first)
+    - search: Search by applicant name, phone, email or public_id (case-insensitive)
     
     BE-201: Extended filters (all use AND logic):
     - subcategory: Filter by subcategory (exact match or use % for LIKE search)
@@ -906,6 +913,7 @@ async def list_cases(
         order_by=order_by,
         skip=skip,
         limit=limit,
+        search=search,
         # BE-201: Extended filters
         subcategory=subcategory,
         applicant_name=applicant_name,

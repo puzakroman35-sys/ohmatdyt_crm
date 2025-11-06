@@ -91,6 +91,9 @@ const CasesPage: React.FC = () => {
     overdue: undefined as boolean | undefined,
   });
 
+  // Локальний стан для пошуку (з debounce)
+  const [searchInput, setSearchInput] = useState('');
+
   // Стан пагінації
   const [pagination, setPagination] = useState({
     current: 1,
@@ -200,6 +203,8 @@ const CasesPage: React.FC = () => {
     }
     if (filters.search) apiFilters.search = filters.search;
 
+    console.log('Loading cases with filters:', apiFilters);
+
     // Побудова сортування
     const sort = {
       field: sorter.field,
@@ -222,7 +227,21 @@ const CasesPage: React.FC = () => {
     if (user) {
       loadCases();
     }
-  }, [user, pagination.current, pagination.pageSize, sorter, filters]);
+  }, [user, pagination.current, pagination.pageSize, sorter, filters.status, filters.category_id, filters.channel_id, filters.dateRange, filters.search, filters.overdue]);
+
+  // Debounce для пошуку
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      console.log('Search input changed:', searchInput);
+      setFilters((prev) => ({ ...prev, search: searchInput }));
+      // Скидаємо пагінацію при зміні пошуку
+      if (searchInput !== filters.search) {
+        setPagination((prev) => ({ ...prev, current: 1 }));
+      }
+    }, 500); // Затримка 500мс
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   // Автооновлення кожні 30 секунд
   useEffect(() => {
@@ -233,7 +252,7 @@ const CasesPage: React.FC = () => {
     }, 30000); // 30 секунд
 
     return () => clearInterval(interval);
-  }, [user, pagination.current, pagination.pageSize, sorter, filters]);
+  }, [user, pagination.current, pagination.pageSize, sorter, filters.status, filters.category_id, filters.channel_id, filters.dateRange, filters.search, filters.overdue]);
 
   // Обробка зміни пагінації
   const handleTableChange = (pagination: any, filters: any, sorter: any) => {
@@ -435,8 +454,8 @@ const CasesPage: React.FC = () => {
               <Input
                 placeholder="Пошук за іменем або ID..."
                 prefix={<SearchOutlined />}
-                value={filters.search}
-                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 allowClear
               />
             </Col>
@@ -445,7 +464,10 @@ const CasesPage: React.FC = () => {
                 placeholder="Статус"
                 style={{ width: '100%' }}
                 value={filters.status}
-                onChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
+                onChange={(value) => {
+                  setFilters(prev => ({ ...prev, status: value }));
+                  setPagination((prev) => ({ ...prev, current: 1 }));
+                }}
                 allowClear
               >
                 {Object.entries(statusLabels).map(([key, label]) => (
@@ -458,7 +480,10 @@ const CasesPage: React.FC = () => {
                 placeholder="Категорія"
                 style={{ width: '100%' }}
                 value={filters.category_id}
-                onChange={(value) => setFilters(prev => ({ ...prev, category_id: value }))}
+                onChange={(value) => {
+                  setFilters(prev => ({ ...prev, category_id: value }));
+                  setPagination((prev) => ({ ...prev, current: 1 }));
+                }}
                 allowClear
                 loading={loadingCategories}
                 showSearch
@@ -474,7 +499,10 @@ const CasesPage: React.FC = () => {
                 placeholder={['Дата від', 'Дата до']}
                 style={{ width: '100%' }}
                 value={filters.dateRange}
-                onChange={(dates) => setFilters(prev => ({ ...prev, dateRange: dates as any }))}
+                onChange={(dates) => {
+                  setFilters(prev => ({ ...prev, dateRange: dates as any }));
+                  setPagination((prev) => ({ ...prev, current: 1 }));
+                }}
                 format="DD.MM.YYYY"
               />
             </Col>
@@ -483,7 +511,10 @@ const CasesPage: React.FC = () => {
                 placeholder="Прострочені"
                 style={{ width: '100%' }}
                 value={filters.overdue}
-                onChange={(value) => setFilters(prev => ({ ...prev, overdue: value }))}
+                onChange={(value) => {
+                  setFilters(prev => ({ ...prev, overdue: value }));
+                  setPagination((prev) => ({ ...prev, current: 1 }));
+                }}
                 allowClear
               >
                 <Option value={true}>Так</Option>
@@ -503,6 +534,7 @@ const CasesPage: React.FC = () => {
                 <Button
                   icon={<ReloadOutlined />}
                   onClick={() => {
+                    setSearchInput('');
                     setFilters({
                       status: undefined,
                       category_id: undefined,
@@ -511,7 +543,7 @@ const CasesPage: React.FC = () => {
                       search: '',
                       overdue: undefined,
                     });
-                    loadCases();
+                    setPagination((prev) => ({ ...prev, current: 1 }));
                   }}
                 >
                   Очистити
