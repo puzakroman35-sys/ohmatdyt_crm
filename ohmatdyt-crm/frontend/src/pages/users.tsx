@@ -359,7 +359,6 @@ const UsersPage: React.FC = () => {
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   allowClear
-                  onClear={() => setSearchInput('')}
                 />
               </Col>
               <Col xs={24} sm={12} md={4}>
