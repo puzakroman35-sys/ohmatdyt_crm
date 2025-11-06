@@ -3,7 +3,8 @@
  * Ohmatdyt CRM
  */
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import api from '@/lib/api';
 
 // Типи
 export interface User {
@@ -23,6 +24,62 @@ export interface AuthState {
   isLoading: boolean;
   error: string | null;
 }
+
+// Request/Response типи для зміни пароля (BE-020)
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+export interface ChangePasswordResponse {
+  message: string;
+  changed_at: string;
+}
+
+// ==================== Async Thunks ====================
+
+/**
+ * Зміна пароля користувача (BE-020)
+ */
+export const changePasswordAsync = createAsyncThunk<
+  ChangePasswordResponse,
+  ChangePasswordRequest,
+  { rejectValue: string }
+>(
+  'auth/changePassword',
+  async (passwordData, { rejectWithValue }) => {
+    try {
+      const response = await api.post<ChangePasswordResponse>(
+        '/api/auth/change-password',
+        passwordData
+      );
+      return response.data;
+    } catch (error: any) {
+      // Обробка різних типів помилок
+      if (error.response?.status === 401) {
+        return rejectWithValue('Поточний пароль невірний');
+      } else if (error.response?.status === 422) {
+        const detail = error.response?.data?.detail;
+        if (typeof detail === 'string') {
+          return rejectWithValue(detail);
+        }
+        return rejectWithValue('Новий пароль не може співпадати з поточним');
+      } else if (error.response?.status === 400 || error.response?.data?.detail) {
+        // Валідаційні помилки від Pydantic
+        const detail = error.response?.data?.detail;
+        if (Array.isArray(detail) && detail.length > 0) {
+          // Беремо першу помилку валідації
+          const firstError = detail[0];
+          return rejectWithValue(firstError.msg || 'Помилка валідації');
+        } else if (typeof detail === 'string') {
+          return rejectWithValue(detail);
+        }
+      }
+      return rejectWithValue('Не вдалося змінити пароль');
+    }
+  }
+);
 
 // Завантаження стану з localStorage
 const loadStateFromStorage = (): Partial<AuthState> => {
@@ -179,6 +236,24 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+  },
+  
+  // ==================== Extra Reducers ====================
+  extraReducers: (builder) => {
+    // Зміна пароля
+    builder
+      .addCase(changePasswordAsync.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(changePasswordAsync.fulfilled, (state) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(changePasswordAsync.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Не вдалося змінити пароль';
+      });
   },
 });
 
