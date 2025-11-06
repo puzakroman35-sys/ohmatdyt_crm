@@ -112,12 +112,38 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontSize: collapsed ? 18 : 20,
             fontWeight: 'bold',
-            transition: 'all 0.2s',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
-          {collapsed ? 'CRM' : 'Ohmatdyt CRM'}
+          {/* Повний логотип */}
+          <span
+            style={{
+              position: 'absolute',
+              fontSize: 20,
+              opacity: collapsed ? 0 : 1,
+              transform: collapsed ? 'scale(0.8)' : 'scale(1)',
+              transition: 'opacity 0.3s ease, transform 0.3s ease',
+              pointerEvents: collapsed ? 'none' : 'auto',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Ohmatdyt CRM
+          </span>
+          {/* Скорочений логотип */}
+          <span
+            style={{
+              position: 'absolute',
+              fontSize: 18,
+              opacity: collapsed ? 1 : 0,
+              transform: collapsed ? 'scale(1)' : 'scale(0.8)',
+              transition: 'opacity 0.3s ease, transform 0.3s ease',
+              pointerEvents: collapsed ? 'auto' : 'none',
+            }}
+          >
+            CRM
+          </span>
         </div>
 
         {/* Меню навігації */}
