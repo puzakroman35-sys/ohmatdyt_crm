@@ -203,8 +203,6 @@ const CasesPage: React.FC = () => {
     }
     if (filters.search) apiFilters.search = filters.search;
 
-    console.log('Loading cases with filters:', apiFilters);
-
     // Побудова сортування
     const sort = {
       field: sorter.field,
@@ -232,7 +230,6 @@ const CasesPage: React.FC = () => {
   // Debounce для пошуку
   useEffect(() => {
     const timer = setTimeout(() => {
-      console.log('Search input changed:', searchInput);
       setFilters((prev) => ({ ...prev, search: searchInput }));
       // Скидаємо пагінацію при зміні пошуку
       if (searchInput !== filters.search) {
