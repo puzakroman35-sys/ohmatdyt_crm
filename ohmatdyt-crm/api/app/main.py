@@ -105,7 +105,7 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth.router)
+app.include_router(auth.router, prefix="/api")  # Authentication endpoints
 app.include_router(categories.router)
 app.include_router(channels.router)
 app.include_router(attachments.router)
