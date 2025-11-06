@@ -14,7 +14,6 @@ import {
   UserOutlined,
   SettingOutlined,
   LogoutOutlined,
-  BellOutlined,
 } from '@ant-design/icons';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -157,9 +156,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
           {/* Права частина header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-            {/* Сповіщення */}
-            <BellOutlined style={{ fontSize: 18, cursor: 'pointer' }} />
-
             {/* Профіль користувача */}
             <Dropdown menu={{ items: profileMenuItems }} placement="bottomRight">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
