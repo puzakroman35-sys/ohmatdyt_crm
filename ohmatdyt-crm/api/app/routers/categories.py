@@ -18,6 +18,7 @@ async def list_categories(
     include_inactive: bool = False,
     skip: int = 0,
     limit: int = 100,
+    search: str = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -27,6 +28,7 @@ async def list_categories(
     - include_inactive: Include inactive categories (default: false)
     - skip: Number of records to skip (default: 0)
     - limit: Maximum number of records to return (default: 100)
+    - search: Search term to filter categories by name (case-insensitive)
     
     Returns only active categories by default.
     """
@@ -37,7 +39,8 @@ async def list_categories(
         db, 
         skip=skip, 
         limit=limit,
-        include_inactive=include_inactive
+        include_inactive=include_inactive,
+        search=search
     )
     
     # Convert to response schemas

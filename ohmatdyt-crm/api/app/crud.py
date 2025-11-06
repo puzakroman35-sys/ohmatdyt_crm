@@ -387,7 +387,8 @@ def get_categories(
     db: Session,
     skip: int = 0,
     limit: int = 100,
-    include_inactive: bool = False
+    include_inactive: bool = False,
+    search: str = None
 ) -> list[models.Category]:
     """
     Get list of categories with optional filtering.
@@ -397,6 +398,7 @@ def get_categories(
         skip: Number of records to skip
         limit: Maximum number of records to return
         include_inactive: Include inactive categories
+        search: Search term to filter by category name (case-insensitive)
         
     Returns:
         List of category models
@@ -405,6 +407,10 @@ def get_categories(
     
     if not include_inactive:
         query = query.where(models.Category.is_active == True)
+    
+    # Фільтрація за пошуковим запитом
+    if search:
+        query = query.where(models.Category.name.ilike(f"%{search}%"))
     
     query = query.offset(skip).limit(limit).order_by(models.Category.name)
     
