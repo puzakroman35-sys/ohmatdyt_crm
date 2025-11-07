@@ -21,7 +21,7 @@ import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectUser, logout } from '@/store/slices/authSlice';
 import ExecutorCategoryBadge from '@/components/ExecutorCategoryBadge'; // FE-013
 
-const { Header, Sider, Content } = Layout;
+const { Header, Sider, Content, Footer } = Layout;
 const { Text } = Typography;
 
 interface MainLayoutProps {
@@ -207,6 +207,32 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         >
           {children}
         </Content>
+
+        {/* Футер з копірайтом */}
+        <Footer
+          style={{
+            textAlign: 'center',
+            background: '#fff',
+            padding: '16px 50px',
+            borderTop: '1px solid #f0f0f0',
+          }}
+        >
+          <Text style={{ color: '#8c8c8c', fontSize: 14 }}>
+            © {new Date().getFullYear()} Ohmatdyt CRM. Розроблено{' '}
+            <a
+              href="https://www.adelina.solutions/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: '#1890ff',
+                textDecoration: 'none',
+                fontWeight: 500,
+              }}
+            >
+              Adelina Solutions
+            </a>
+          </Text>
+        </Footer>
       </Layout>
     </Layout>
   );
