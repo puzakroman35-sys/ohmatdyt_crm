@@ -72,14 +72,15 @@ def send_new_case_notification(self, case_id: str, case_public_id: int, category
     from app import models, crud
     from app.email_service import send_email, render_template
     from datetime import datetime, timedelta
+    from sqlalchemy import select
     
     db = SessionLocal()
     
     try:
         # Get case details
         case = db.execute(
-            f"SELECT * FROM cases WHERE id = '{case_id}'"
-        ).first()
+            select(models.Case).where(models.Case.id == UUID(case_id))
+        ).scalar_one_or_none()
         
         if not case:
             print(f"[NOTIFICATION] Case {case_id} not found, skipping")
@@ -87,15 +88,18 @@ def send_new_case_notification(self, case_id: str, case_public_id: int, category
         
         # Get category details
         category = db.execute(
-            f"SELECT * FROM categories WHERE id = '{category_id}'"
-        ).first()
+            select(models.Category).where(models.Category.id == UUID(category_id))
+        ).scalar_one_or_none()
         
         category_name = category.name if category else "Unknown"
         
         # Get executors (simplified - gets all active executors)
         executors = db.execute(
-            "SELECT * FROM users WHERE role IN ('EXECUTOR', 'ADMIN') AND is_active = true"
-        ).fetchall()
+            select(models.User).where(
+                models.User.role.in_([models.UserRole.EXECUTOR, models.UserRole.ADMIN]),
+                models.User.is_active == True
+            )
+        ).scalars().all()
         
         print(f"[BE-013] Sending notifications for new case #{case_public_id}")
         print(f"[BE-013] Category: {category_name}")
@@ -107,11 +111,15 @@ def send_new_case_notification(self, case_id: str, case_public_id: int, category
         for executor in executors:
             # Render email template
             text_body, html_body = render_template("new_case", {
-                "public_id": case_public_id,
-                "category": category_name,
-                "channel": "Email",  # TODO: get from case
+                "executor_name": executor.full_name,
+                "case_public_id": case_public_id,
+                "category_name": category_name,
+                "channel_name": "Email",  # TODO: get from case
                 "applicant_name": case.applicant_name,
-                "summary": case.summary[:200] + "..." if len(case.summary) > 200 else case.summary,
+                "applicant_phone": case.applicant_phone or "",
+                "applicant_email": case.applicant_email or "",
+                "description": case.summary[:500] if case.summary else "",
+                "created_at": case.created_at.strftime("%d.%m.%Y %H:%M") if case.created_at else "",
             })
             
             # Create notification log entry
@@ -119,8 +127,8 @@ def send_new_case_notification(self, case_id: str, case_public_id: int, category
                 db=db,
                 notification_type=models.NotificationType.NEW_CASE,
                 recipient_email=executor.email,
-                recipient_user_id=UUID(executor.id),
-                related_case_id=UUID(case_id),
+                recipient_user_id=executor.id if isinstance(executor.id, UUID) else UUID(executor.id),
+                related_case_id=UUID(case_id) if isinstance(case_id, str) else case_id,
                 subject=f"Нове звернення #{case_public_id}",
                 body_text=text_body,
                 body_html=html_body,
@@ -207,6 +215,9 @@ def send_case_taken_notification(
     try:
         # Import here to avoid circular dependencies
         from app.database import SessionLocal
+        from app import models
+        from sqlalchemy import select
+        from uuid import UUID
         
         # Create database session
         db = SessionLocal()
@@ -214,13 +225,13 @@ def send_case_taken_notification(
         try:
             # Get executor details
             executor = db.execute(
-                f"SELECT * FROM users WHERE id = '{executor_id}'"
-            ).first()
+                select(models.User).where(models.User.id == UUID(executor_id))
+            ).scalar_one_or_none()
             
             # Get author details
             author = db.execute(
-                f"SELECT * FROM users WHERE id = '{author_id}'"
-            ).first()
+                select(models.User).where(models.User.id == UUID(author_id))
+            ).scalar_one_or_none()
             
             if not author:
                 print(f"Author {author_id} not found, skipping notification")
@@ -304,6 +315,9 @@ def send_case_status_changed_notification(
     try:
         # Import here to avoid circular dependencies
         from app.database import SessionLocal
+        from app import models
+        from sqlalchemy import select
+        from uuid import UUID
         
         # Create database session
         db = SessionLocal()
@@ -311,13 +325,13 @@ def send_case_status_changed_notification(
         try:
             # Get executor details
             executor = db.execute(
-                f"SELECT * FROM users WHERE id = '{executor_id}'"
-            ).first()
+                select(models.User).where(models.User.id == UUID(executor_id))
+            ).scalar_one_or_none()
             
             # Get author details
             author = db.execute(
-                f"SELECT * FROM users WHERE id = '{author_id}'"
-            ).first()
+                select(models.User).where(models.User.id == UUID(author_id))
+            ).scalar_one_or_none()
             
             if not author:
                 print(f"Author {author_id} not found, skipping notification")
@@ -433,18 +447,24 @@ def send_comment_notification(
                 # Внутрішній коментар: відправляємо виконавцям категорії + адмінам
                 # БЕЗ автора звернення (оператора)
                 print(f"[NOTIFICATION] Internal comment on case #{case_public_id}")
+                from app import models
+                from sqlalchemy import select
+                from uuid import UUID
                 
                 # Отримати всіх EXECUTOR та ADMIN (пізніше буде фільтр по категорії)
                 executors_admins = db.execute(
-                    "SELECT * FROM users WHERE role IN ('EXECUTOR', 'ADMIN') AND is_active = true"
-                ).fetchall()
+                    select(models.User).where(
+                        models.User.role.in_([models.UserRole.EXECUTOR, models.UserRole.ADMIN]),
+                        models.User.is_active == True
+                    )
+                ).scalars().all()
                 
                 for user in executors_admins:
-                    if user.id != author_id:  # Не надсилати автору коментаря
+                    if str(user.id) != author_id:  # Не надсилати автору коментаря
                         recipients.append({
                             "email": user.email,
                             "full_name": user.full_name,
-                            "role": user.role
+                            "role": user.role.value
                         })
                 
                 print(f"[NOTIFICATION] Notifying {len(recipients)} executor(s)/admin(s)")
@@ -452,13 +472,16 @@ def send_comment_notification(
             else:
                 # Публічний коментар: відправляємо автору звернення + відповідальному
                 print(f"[NOTIFICATION] Public comment on case #{case_public_id}")
+                from app import models
+                from sqlalchemy import select
+                from uuid import UUID
                 
                 # Автор звернення (OPERATOR)
                 case_author = db.execute(
-                    f"SELECT * FROM users WHERE id = '{case_author_id}'"
-                ).first()
+                    select(models.User).where(models.User.id == UUID(case_author_id))
+                ).scalar_one_or_none()
                 
-                if case_author and case_author.id != author_id:
+                if case_author and str(case_author.id) != author_id:
                     recipients.append({
                         "email": case_author.email,
                         "full_name": case_author.full_name,
@@ -468,10 +491,10 @@ def send_comment_notification(
                 # Відповідальний виконавець
                 if responsible_id:
                     responsible = db.execute(
-                        f"SELECT * FROM users WHERE id = '{responsible_id}'"
-                    ).first()
+                        select(models.User).where(models.User.id == UUID(responsible_id))
+                    ).scalar_one_or_none()
                     
-                    if responsible and responsible.id != author_id:
+                    if responsible and str(responsible.id) != author_id:
                         recipients.append({
                             "email": responsible.email,
                             "full_name": responsible.full_name,
