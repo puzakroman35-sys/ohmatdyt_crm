@@ -23,6 +23,12 @@ const ExecutorCategoryBadge: React.FC = () => {
   const user = useAppSelector(selectUser);
   const [categories, setCategories] = useState<CategoryAccess[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  // Встановлюємо прапор клієнта для уникнення помилок гідрації
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     const fetchCategoryAccess = async () => {
@@ -44,8 +50,8 @@ const ExecutorCategoryBadge: React.FC = () => {
     fetchCategoryAccess();
   }, [user]);
 
-  // Не показуємо компонент якщо не EXECUTOR
-  if (!user || user.role !== 'EXECUTOR') {
+  // Не показуємо компонент якщо не на клієнті або не EXECUTOR
+  if (!isClient || !user || user.role !== 'EXECUTOR') {
     return null;
   }
 
