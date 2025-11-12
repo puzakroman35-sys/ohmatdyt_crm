@@ -21,21 +21,28 @@ interface AuthGuardProps {
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const router = useRouter();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  // Завжди починаємо з isChecking = true, щоб на сервері і клієнті був однаковий вигляд
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // Перевіряємо авторизацію при монтуванні компонента
-    if (!isAuthenticated) {
-      // Зберігаємо поточний URL для редіректу після логіну
-      const returnUrl = router.asPath;
-      router.push(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
-    } else {
-      setIsChecking(false);
-    }
+    // Невелика затримка для завершення ініціалізації AuthProvider
+    const timer = setTimeout(() => {
+      // Перевіряємо авторизацію
+      if (!isAuthenticated) {
+        // Зберігаємо поточний URL для редіректу після логіну
+        const returnUrl = router.asPath;
+        router.push(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
+      } else {
+        setIsChecking(false);
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [isAuthenticated, router]);
 
-  // Показуємо spinner під час перевірки
-  if (isChecking || !isAuthenticated) {
+  // Завжди показуємо spinner поки перевіряємо авторизацію
+  // Це забезпечує однаковий рендер на сервері та клієнті
+  if (isChecking) {
     return (
       <div
         style={{
@@ -44,8 +51,9 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
           alignItems: 'center',
           minHeight: '100vh',
         }}
+        suppressHydrationWarning
       >
-        <Spin size="large" tip="Завантаження..." />
+        <Spin size="large" />
       </div>
     );
   }

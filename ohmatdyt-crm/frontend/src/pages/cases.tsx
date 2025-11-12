@@ -583,4 +583,12 @@ const CasesPage: React.FC = () => {
   );
 };
 
+// Вимикаємо SSR для цієї сторінки, щоб уникнути помилок гідрації
+// пов'язаних з різним станом авторизації на сервері та клієнті
+export async function getServerSideProps() {
+  return {
+    props: {},
+  };
+}
+
 export default CasesPage;

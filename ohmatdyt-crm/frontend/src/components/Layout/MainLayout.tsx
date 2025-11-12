@@ -3,7 +3,7 @@
  * Ohmatdyt CRM
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Avatar, Dropdown, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import {
@@ -30,14 +30,20 @@ interface MainLayoutProps {
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   const router = useRouter();
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
 
+  // Встановлюємо прапор клієнта для уникнення помилок гідрації
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   // Меню бічної панелі (динамічне залежно від ролі)
   const sideMenuItems: MenuProps['items'] = [
-    // Dashboard тільки для ADMIN
-    ...(user?.role === 'ADMIN' ? [{
+    // Dashboard тільки для ADMIN - рендеримо тільки на клієнті
+    ...(isClient && user?.role === 'ADMIN' ? [{
       key: '/dashboard',
       icon: <DashboardOutlined />,
       label: <Link href="/dashboard">Головна</Link>,
@@ -47,8 +53,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       icon: <FileTextOutlined />,
       label: <Link href="/cases">Звернення</Link>,
     },
-    // Адміністрування тільки для ADMIN
-    ...(user?.role === 'ADMIN' ? [{
+    // Адміністрування тільки для ADMIN - рендеримо тільки на клієнті
+    ...(isClient && user?.role === 'ADMIN' ? [{
       key: 'admin',
       icon: <SettingOutlined />,
       label: 'Адміністрування',
@@ -189,7 +195,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                   icon={<UserOutlined />}
                   style={{ backgroundColor: '#1890ff' }}
                 />
-                <Text>{user?.full_name || 'Користувач'}</Text>
+                <Text suppressHydrationWarning>
+                  {isClient && user ? user.full_name : 'Користувач'}
+                </Text>
               </div>
             </Dropdown>
           </div>
@@ -216,8 +224,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             padding: '16px 50px',
             borderTop: '1px solid #f0f0f0',
           }}
+          suppressHydrationWarning
         >
-          <Text style={{ color: '#8c8c8c', fontSize: 14 }}>
+          <Text style={{ color: '#8c8c8c', fontSize: 14 }} suppressHydrationWarning>
             © {new Date().getFullYear()} Ohmatdyt CRM. Розроблено{' '}
             <a
               href="https://www.adelina.solutions/"
