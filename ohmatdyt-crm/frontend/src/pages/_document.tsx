@@ -10,7 +10,6 @@ export default function Document() {
     <Html lang="uk">
       <Head>
         <link rel="icon" href="/favicon.ico" />
-        <link rel="shortcut icon" href="/favicon.ico" />
         <meta name="description" content="Ohmatdyt CRM - Система управління зверненнями" />
       </Head>
       <body>
