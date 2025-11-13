@@ -1,0 +1,13 @@
+# Commands to deploy categories search fix to production
+
+# Step 1: Pull latest code
+ssh rpadmin@10.24.2.187 "cd ohmatdyt-crm/ohmatdyt-crm && git pull"
+
+# Step 2: Build API
+ssh rpadmin@10.24.2.187 "cd ohmatdyt-crm/ohmatdyt-crm && docker compose -f docker-compose.yml -f docker-compose.prod.yml build api"
+
+# Step 3: Restart API
+ssh rpadmin@10.24.2.187 "cd ohmatdyt-crm/ohmatdyt-crm && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d api"
+
+# Step 4: Test the search
+python d:\AI_boost\ohmatdyt_crm\test_category_access_endpoint.py

@@ -12,7 +12,6 @@ import {
   Space,
   Button,
   Select,
-  DatePicker,
   Input,
   Row,
   Col,
@@ -43,11 +42,11 @@ import {
   Category,
 } from '@/store/slices/casesSlice';
 import { selectUser } from '@/store/slices/authSlice';
+import { CaseDateRangeFilter } from '@/components/Cases'; // FE-015
 import api from '@/lib/api';
 
 const { Title } = Typography;
 const { Option } = Select;
-const { RangePicker } = DatePicker;
 
 // Статуси з українськими назвами
 const statusLabels: Record<CaseStatus, string> = {
@@ -492,15 +491,12 @@ const CasesPage: React.FC = () => {
               </Select>
             </Col>
             <Col xs={24} sm={12} md={5}>
-              <RangePicker
-                placeholder={['Дата від', 'Дата до']}
-                style={{ width: '100%' }}
+              <CaseDateRangeFilter
                 value={filters.dateRange}
-                onChange={(dates) => {
-                  setFilters(prev => ({ ...prev, dateRange: dates as any }));
+                onChange={(dates: [dayjs.Dayjs, dayjs.Dayjs] | undefined) => {
+                  setFilters(prev => ({ ...prev, dateRange: dates }));
                   setPagination((prev) => ({ ...prev, current: 1 }));
                 }}
-                format="DD.MM.YYYY"
               />
             </Col>
             <Col xs={24} sm={12} md={4}>
@@ -548,6 +544,7 @@ const CasesPage: React.FC = () => {
               </Space>
             </Col>
           </Row>
+
         </Card>
 
         {/* Таблиця */}
