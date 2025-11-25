@@ -1,6 +1,7 @@
 """CRUD operations for database models."""
 
 import logging
+import sys
 from typing import Optional
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
@@ -910,6 +911,10 @@ def get_all_cases(
     """
     from datetime import datetime
     
+    # Debug logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"get_all_cases called with date_from='{date_from}', date_to='{date_to}'")
+    
     query = select(models.Case).options(
         joinedload(models.Case.category),
         joinedload(models.Case.channel),
@@ -1002,6 +1007,9 @@ def get_all_cases(
     if date_to:
         try:
             date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            # If time is not specified (00:00:00), set to end of day (23:59:59)
+            if date_to_dt.hour == 0 and date_to_dt.minute == 0 and date_to_dt.second == 0:
+                date_to_dt = date_to_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
             query = query.where(models.Case.created_at <= date_to_dt)
         except ValueError:
             pass  # Invalid date format, skip filter
@@ -1097,6 +1105,9 @@ def get_all_cases(
     if date_to:
         try:
             date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            # If time is not specified (00:00:00), set to end of day (23:59:59)
+            if date_to_dt.hour == 0 and date_to_dt.minute == 0 and date_to_dt.second == 0:
+                date_to_dt = date_to_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
             count_query = count_query.where(models.Case.created_at <= date_to_dt)
         except ValueError:
             pass
@@ -2255,6 +2266,9 @@ def get_dashboard_summary(
     
     if date_to:
         date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+        # If time is not specified (00:00:00), set to end of day (23:59:59)
+        if date_to_dt.hour == 0 and date_to_dt.minute == 0 and date_to_dt.second == 0:
+            date_to_dt = date_to_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
         base_filter.append(models.Case.created_at <= date_to_dt)
     
     # Отримуємо загальну кількість звернень
@@ -2276,6 +2290,14 @@ def get_dashboard_summary(
         count = db.execute(status_query).scalar() or 0
         status_counts[status.value] = count
     
+    # Calculate period_end with end-of-day adjustment if date_to was provided
+    period_end_value = None
+    if date_to:
+        period_end_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+        if period_end_dt.hour == 0 and period_end_dt.minute == 0 and period_end_dt.second == 0:
+            period_end_dt = period_end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+        period_end_value = period_end_dt
+    
     return {
         'total_cases': total_cases,
         'new_cases': status_counts.get('NEW', 0),
@@ -2284,7 +2306,7 @@ def get_dashboard_summary(
         'rejected_cases': status_counts.get('REJECTED', 0),
         'done_cases': status_counts.get('DONE', 0),
         'period_start': datetime.fromisoformat(date_from.replace('Z', '+00:00')) if date_from else None,
-        'period_end': datetime.fromisoformat(date_to.replace('Z', '+00:00')) if date_to else None,
+        'period_end': period_end_value,
     }
 
 
@@ -2317,6 +2339,9 @@ def get_status_distribution(
     
     if date_to:
         date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+        # If time is not specified (00:00:00), set to end of day (23:59:59)
+        if date_to_dt.hour == 0 and date_to_dt.minute == 0 and date_to_dt.second == 0:
+            date_to_dt = date_to_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
         base_filter.append(models.Case.created_at <= date_to_dt)
     
     # Загальна кількість звернень
@@ -2344,11 +2369,19 @@ def get_status_distribution(
             'percentage': round(percentage, 2)
         })
     
+    # Calculate period_end with end-of-day adjustment if date_to was provided
+    period_end_value = None
+    if date_to:
+        period_end_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+        if period_end_dt.hour == 0 and period_end_dt.minute == 0 and period_end_dt.second == 0:
+            period_end_dt = period_end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+        period_end_value = period_end_dt
+    
     return {
         'total_cases': total_cases,
         'distribution': distribution,
         'period_start': datetime.fromisoformat(date_from.replace('Z', '+00:00')) if date_from else None,
-        'period_end': datetime.fromisoformat(date_to.replace('Z', '+00:00')) if date_to else None,
+        'period_end': period_end_value,
     }
 
 
@@ -2458,6 +2491,9 @@ def get_executors_efficiency(
         
         if date_to:
             date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            # If time is not specified (00:00:00), set to end of day (23:59:59)
+            if date_to_dt.hour == 0 and date_to_dt.minute == 0 and date_to_dt.second == 0:
+                date_to_dt = date_to_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
             completed_query = completed_query.where(models.Case.updated_at <= date_to_dt)
         
         completed_in_period = db.execute(completed_query).scalar() or 0
@@ -2480,6 +2516,9 @@ def get_executors_efficiency(
             
             if date_to:
                 date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+                # If time is not specified (00:00:00), set to end of day (23:59:59)
+                if date_to_dt.hour == 0 and date_to_dt.minute == 0 and date_to_dt.second == 0:
+                    date_to_dt = date_to_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
                 completed_cases_query = completed_cases_query.where(
                     models.Case.updated_at <= date_to_dt
                 )
@@ -2517,9 +2556,17 @@ def get_executors_efficiency(
             'overdue_count': overdue_count,
         })
     
+    # Calculate period_end with end-of-day adjustment if date_to was provided
+    period_end_value = None
+    if date_to:
+        period_end_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+        if period_end_dt.hour == 0 and period_end_dt.minute == 0 and period_end_dt.second == 0:
+            period_end_dt = period_end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+        period_end_value = period_end_dt
+    
     return {
         'period_start': datetime.fromisoformat(date_from.replace('Z', '+00:00')) if date_from else None,
-        'period_end': datetime.fromisoformat(date_to.replace('Z', '+00:00')) if date_to else None,
+        'period_end': period_end_value,
         'executors': executors_data
     }
 
@@ -2555,6 +2602,9 @@ def get_top_categories(
     
     if date_to:
         date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+        # If time is not specified (00:00:00), set to end of day (23:59:59)
+        if date_to_dt.hour == 0 and date_to_dt.minute == 0 and date_to_dt.second == 0:
+            date_to_dt = date_to_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
         base_filter.append(models.Case.created_at <= date_to_dt)
     
     # Загальна кількість звернень
@@ -2626,9 +2676,17 @@ def get_top_categories(
             'percentage_of_total': round(percentage, 2)
         })
     
+    # Calculate period_end with end-of-day adjustment if date_to was provided
+    period_end_value = None
+    if date_to:
+        period_end_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+        if period_end_dt.hour == 0 and period_end_dt.minute == 0 and period_end_dt.second == 0:
+            period_end_dt = period_end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+        period_end_value = period_end_dt
+    
     return {
         'period_start': datetime.fromisoformat(date_from.replace('Z', '+00:00')) if date_from else None,
-        'period_end': datetime.fromisoformat(date_to.replace('Z', '+00:00')) if date_to else None,
+        'period_end': period_end_value,
         'total_cases_all_categories': total_cases_all,
         'top_categories': top_categories,
         'limit': limit
@@ -2811,6 +2869,9 @@ def get_executor_cases(
     if date_to:
         try:
             date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            # If time is not specified (00:00:00), set to end of day (23:59:59)
+            if date_to_dt.hour == 0 and date_to_dt.minute == 0 and date_to_dt.second == 0:
+                date_to_dt = date_to_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
             query = query.where(models.Case.created_at <= date_to_dt)
         except ValueError:
             pass
@@ -2899,6 +2960,9 @@ def get_executor_cases(
     if date_to:
         try:
             date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            # If time is not specified (00:00:00), set to end of day (23:59:59)
+            if date_to_dt.hour == 0 and date_to_dt.minute == 0 and date_to_dt.second == 0:
+                date_to_dt = date_to_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
             count_query = count_query.where(models.Case.created_at <= date_to_dt)
         except ValueError:
             pass

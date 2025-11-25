@@ -1,0 +1,293 @@
+═══════════════════════════════════════════════════════════════
+  DEPLOYMENT CHECKLIST - crm.ohmatdyt.com.ua
+═══════════════════════════════════════════════════════════════
+
+Дата початку: _______________
+Відповідальний: _______________
+
+═══════════════════════════════════════════════════════════════
+
+ФАЗА 1: ПІДГОТОВКА СЕРВЕРА
+═══════════════════════════════════════════════════════════════
+
+[ ] 1.1. Docker встановлено
+    Команда: docker --version
+    Очікуваний результат: Docker version 24.x або новіше
+
+[ ] 1.2. Docker Compose встановлено
+    Команда: docker compose version
+    Очікуваний результат: Docker Compose version v2.x або новіше
+
+[ ] 1.3. Git встановлено
+    Команда: git --version
+    
+[ ] 1.4. Проект клоновано з GitHub
+    Шлях: ~/ohmatdyt-crm/
+    
+[ ] 1.5. DNS налаштовано
+    Команда: nslookup crm.ohmatdyt.com.ua
+    Має вказувати на IP сервера
+
+[ ] 1.6. Порти 80 та 443 відкриті
+    Команда: sudo netstat -tulpn | grep -E ':(80|443)'
+    
+[ ] 1.7. SSH доступ налаштовано
+    Команда: ssh user@crm.ohmatdyt.com.ua
+
+═══════════════════════════════════════════════════════════════
+
+ФАЗА 2: КОНФІГУРАЦІЯ
+═══════════════════════════════════════════════════════════════
+
+[ ] 2.1. Файл .env.prod створено
+    Шлях: ~/ohmatdyt-crm/.env.prod
+
+[ ] 2.2. POSTGRES_PASSWORD змінено
+    Старе: OhmProd2024SecurePass!
+    Нове: _______________
+
+[ ] 2.3. DATABASE_URL оновлено з новим паролем
+    ✓ Пароль в DATABASE_URL відповідає POSTGRES_PASSWORD
+
+[ ] 2.4. JWT_SECRET згенеровано
+    Команда: openssl rand -hex 32
+    Новий секрет: _______________
+
+[ ] 2.5. SMTP налаштовано (опціонально)
+    [ ] SMTP_HOST: _______________
+    [ ] SMTP_USER: _______________
+    [ ] SMTP_PASSWORD: _______________
+
+[ ] 2.6. Домен правильно вказано
+    NGINX_SERVER_NAME=crm.ohmatdyt.com.ua
+    ALLOWED_HOSTS=crm.ohmatdyt.com.ua,localhost,127.0.0.1,nginx
+    CORS_ORIGINS=https://crm.ohmatdyt.com.ua,http://localhost
+
+═══════════════════════════════════════════════════════════════
+
+ФАЗА 3: DOCKER VOLUMES
+═══════════════════════════════════════════════════════════════
+
+[ ] 3.1. Volume db-data створено
+    Команда: docker volume create ohmatdyt_crm_db-data
+
+[ ] 3.2. Volume media створено
+    Команда: docker volume create ohmatdyt_crm_media
+
+[ ] 3.3. Volume static створено
+    Команда: docker volume create ohmatdyt_crm_static
+
+[ ] 3.4. Volumes перевірено
+    Команда: docker volume ls | grep ohmatdyt_crm
+    Очікується: 3 volumes
+
+═══════════════════════════════════════════════════════════════
+
+ФАЗА 4: SSL/HTTPS (Let's Encrypt)
+═══════════════════════════════════════════════════════════════
+
+[ ] 4.1. Let's Encrypt setup запущено
+    Команда: cd ~/ohmatdyt-crm/nginx && bash setup-letsencrypt.sh
+
+[ ] 4.2. Домен введено: crm.ohmatdyt.com.ua
+
+[ ] 4.3. Email введено: _______________
+
+[ ] 4.4. Сертифікати створено
+    Шлях: ~/ohmatdyt-crm/nginx/certbot/conf/live/crm.ohmatdyt.com.ua/
+
+[ ] 4.5. Certbot успішно перевірив домен
+    Очікуваний результат: Successfully received certificate
+
+═══════════════════════════════════════════════════════════════
+
+ФАЗА 5: DOCKER BUILD & START
+═══════════════════════════════════════════════════════════════
+
+[ ] 5.1. Docker образи зібрано
+    Команда: docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+    Час збірки: ~10-15 хвилин
+
+[ ] 5.2. Сервіси запущено
+    Команда: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+[ ] 5.3. Всі контейнери running
+    Команда: docker compose ps
+    Очікується: 7 контейнерів (db, redis, api, frontend, worker, beat, nginx)
+    
+    [ ] db - running
+    [ ] redis - running
+    [ ] api - running
+    [ ] frontend - running
+    [ ] worker - running
+    [ ] beat - running
+    [ ] nginx - running
+
+═══════════════════════════════════════════════════════════════
+
+ФАЗА 6: DATABASE SETUP
+═══════════════════════════════════════════════════════════════
+
+[ ] 6.1. Міграції виконано
+    Команда: docker compose -f docker-compose.yml -f docker-compose.prod.yml exec api alembic upgrade head
+    Очікуваний результат: Running upgrade ... -> ..., done
+
+[ ] 6.2. Таблиці створено
+    Команда: docker compose exec db psql -U ohm_user -d ohm_db -c "\dt"
+    Має показати список таблиць
+
+[ ] 6.3. Адміністратор створений
+    Email: admin@ohmatdyt.com
+    Password (тимчасовий): admin123
+
+═══════════════════════════════════════════════════════════════
+
+ФАЗА 7: HEALTH CHECKS
+═══════════════════════════════════════════════════════════════
+
+[ ] 7.1. Frontend доступний
+    URL: https://crm.ohmatdyt.com.ua
+    Очікується: Сторінка логіну
+
+[ ] 7.2. Health endpoint працює
+    URL: https://crm.ohmatdyt.com.ua/health
+    Очікується: {"status": "ok"}
+
+[ ] 7.3. API доступний
+    URL: https://crm.ohmatdyt.com.ua/api/healthz
+    Очікується: {"status": "ok"}
+
+[ ] 7.4. API Docs доступні
+    URL: https://crm.ohmatdyt.com.ua/api/docs
+    Очікується: Swagger UI
+
+[ ] 7.5. SSL сертифікат валідний
+    Перевірка: Відкрити https://crm.ohmatdyt.com.ua в браузері
+    Очікується: Замок в адресному рядку (без попереджень)
+
+═══════════════════════════════════════════════════════════════
+
+ФАЗА 8: FUNCTIONAL TESTING
+═══════════════════════════════════════════════════════════════
+
+[ ] 8.1. Логін працює
+    Email: admin@ohmatdyt.com
+    Password: admin123
+
+[ ] 8.2. Dashboard відкривається
+
+[ ] 8.3. Пароль адміністратора змінено
+    Старий: admin123
+    Новий: _______________
+
+[ ] 8.4. Створення нового користувача працює
+
+[ ] 8.5. Створення справи працює
+
+[ ] 8.6. Завантаження файлів працює
+
+═══════════════════════════════════════════════════════════════
+
+ФАЗА 9: MONITORING & LOGS
+═══════════════════════════════════════════════════════════════
+
+[ ] 9.1. Логи перевірено
+    Команда: docker compose logs --tail=100
+    Немає критичних помилок
+
+[ ] 9.2. Використання ресурсів нормальне
+    Команда: docker stats
+    CPU < 80%, Memory < 80%
+
+[ ] 9.3. Database size перевірено
+    Команда: docker compose exec db psql -U ohm_user -d ohm_db -c "SELECT pg_size_pretty(pg_database_size('ohm_db'));"
+
+═══════════════════════════════════════════════════════════════
+
+ФАЗА 10: BACKUP SETUP
+═══════════════════════════════════════════════════════════════
+
+[ ] 10.1. Backup скрипт створено
+
+[ ] 10.2. Перший backup виконано
+    Команда: docker compose exec db pg_dump -U ohm_user ohm_db > backup_initial.sql
+
+[ ] 10.3. Cron job для backup налаштовано (опціонально)
+
+═══════════════════════════════════════════════════════════════
+
+ФАЗА 11: DOCUMENTATION
+═══════════════════════════════════════════════════════════════
+
+[ ] 11.1. Паролі збережено в безпечному місці
+    [ ] POSTGRES_PASSWORD
+    [ ] JWT_SECRET
+    [ ] Admin password
+    [ ] SMTP_PASSWORD (якщо використовується)
+
+[ ] 11.2. IP адреса сервера задокументована
+    IP: _______________
+
+[ ] 11.3. SSH доступ задокументований
+    User: _______________
+    Key location: _______________
+
+[ ] 11.4. Контактна інформація оновлена
+    Адміністратор сервера: _______________
+    Email: _______________
+    Телефон: _______________
+
+═══════════════════════════════════════════════════════════════
+
+ФІНАЛЬНА ПЕРЕВІРКА
+═══════════════════════════════════════════════════════════════
+
+[ ] Всі сервіси запущені та працюють
+[ ] SSL сертифікат валідний
+[ ] Логін працює
+[ ] Функціональність CRM працює
+[ ] Паролі змінено та збережено
+[ ] Backup створено
+[ ] Документація оновлена
+[ ] Команда проінформована про запуск
+
+═══════════════════════════════════════════════════════════════
+
+DEPLOYMENT COMPLETED
+
+Дата завершення: _______________
+Підпис: _______________
+
+═══════════════════════════════════════════════════════════════
+
+КОРИСНІ КОМАНДИ ДЛЯ ЩОДЕННОГО ВИКОРИСТАННЯ
+═══════════════════════════════════════════════════════════════
+
+# Статус
+docker compose ps
+
+# Логи всіх сервісів
+docker compose logs -f
+
+# Логи конкретного сервісу
+docker compose logs -f api
+
+# Перезапуск сервісу
+docker compose restart api
+
+# Зупинити всі сервіси
+docker compose down
+
+# Запустити всі сервіси
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# Backup бази даних
+docker compose exec db pg_dump -U ohm_user ohm_db > backup_$(date +%Y%m%d).sql
+
+# Перевірка використання ресурсів
+docker stats
+
+# Очистка старих образів
+docker system prune -a
+
+═══════════════════════════════════════════════════════════════
